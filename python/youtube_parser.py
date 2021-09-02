@@ -1,12 +1,14 @@
 import json
+import random
 import urllib.request
 
-class YouTubeChannelParser():
+
+class YouTubeChannelsParser():
     """Класс парсера каналов в файле ютуба."""
     def __init__(self):
         """Инициализация пути к файлу с url, ключа для доступа в юутб, класс для выкачки данных."""
-        self.PATH_TO_URLS = "youtube_parser/txt_files/urls_to_channels.txt"
-        self.API_KEY = "AIzaSyCcpV99-q1fUZiiasGo29tO_I1DjkLILKQ"
+        self.PATH_TO_URLS = "txt_files/urls_to_channels.txt"
+        self.API_KEY = "AIzaSyDPRxayW_cIe_8mkhtW-dsknFS46H6opnA"
 
     def parse(self):
         """Основная функция парсера, которая возвращает список видео."""
@@ -15,6 +17,7 @@ class YouTubeChannelParser():
         for channel_id in channel_ids:
             channel_id = channel_id.strip()
             video_links.extend(self.get_all_video_from_channel(channel_id))
+        random.shuffle(video_links)
         return video_links
 
     def get_channels_urls(self):
@@ -47,10 +50,3 @@ class YouTubeChannelParser():
                 video_links.append(base_video_url + i['id']['videoId'])
 
         return video_links
-
-
-if __name__ == "__main__":
-    parser = YouTubeChannelParser()
-    links = parser.parse()
-    for link in links:
-        print(link, end='\n')
