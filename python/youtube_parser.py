@@ -20,6 +20,17 @@ class YouTubeChannelsParser():
         random.shuffle(video_links)
         return video_links
 
+    def get_video_prewiew(self, video_links):
+        """Получение ссылок на превью для скачивания."""
+        for link in video_links:
+            video_id = link.split('=')[1]
+            url = f"https://www.googleapis.com/youtube/v3/videos?id={video_id}&key={self.API_KEY}"
+            inp = urllib.request.urlopen(url)
+            resp = json.load(inp)
+            img_url = resp["videos"]["snippet"]["thumbnails"]["default"] 
+            
+
+
     def get_channels_urls(self):
         """Получение пяти последних видео с выбранных каналов в файле."""
         with open(self.PATH_TO_URLS, 'r') as file:
