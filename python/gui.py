@@ -6,8 +6,8 @@ import pafy
 
 import vlc
 
-from PyQt5.QtCore import pyqtSignal, QEvent, QObject
-from PyQt5.QtWidgets import QApplication, QDialog, QPushButton, QWidget, QLabel
+from PyQt5.QtCore import pyqtSignal, QEvent, QObject, QRect
+from PyQt5.QtWidgets import QApplication, QDialog, QPushButton, QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QGridLayout
 from  PyQt5.QtGui import QPixmap
 
 from youtube_parser import YouTubeChannelsParser
@@ -138,8 +138,33 @@ class GoodYoutubeGUI(QDialog):
         result = f"{date[2]} {digits_to_words[date[1]]} {date[0]} года"
         return result
 
+class ScrollWidget(QWidget):      
+    def __init__(self, parent=None):
+        super(ScrollWidget, self).__init__(parent)
+        self.initUi()
+
+    def initUi(self):
+        self.layoutV = QVBoxLayout(self)
+
+        self.area = QScrollArea(self)
+        self.area.setWidgetResizable(True)
+        self.scrollAreaWidgetContents = QWidget()
+        self.scrollAreaWidgetContents.setGeometry(QRect(0, 0, 200, 100))
+
+        self.layoutH = QHBoxLayout(self.scrollAreaWidgetContents)
+        self.gridLayout = QGridLayout()
+        self.layoutH.addLayout(self.gridLayout)
+
+        self.area.setWidget(self.scrollAreaWidgetContents)
+        self.layoutV.addWidget(self.area)
+
+        self.widget = GoodYoutubeGUI()
+        self.gridLayout.addWidget(self.widget)
+        self.setGeometry(700, 200, 1000, 1000)        
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    dlg_main = GoodYoutubeGUI()
-    dlg_main.show()
+    window = ScrollWidget()
+    window.show()
     sys.exit(app.exec_())

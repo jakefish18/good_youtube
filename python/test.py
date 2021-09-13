@@ -215,24 +215,11 @@ class ScrollWidget(QWidget):
         self.layoutH.addLayout(self.gridLayout)
 
         self.area.setWidget(self.scrollAreaWidgetContents)
-        self.add_button = QPushButton("Add Widget")
         self.layoutV.addWidget(self.area)
-        self.layoutV.addWidget(self.add_button)
-        self.add_button.clicked.connect(self.addWidget)
 
         self.widget = GoodYoutubeGUI()
         self.gridLayout.addWidget(self.widget)
         self.setGeometry(700, 200, 1000, 1000)        
-
-    def addWidget(self):
-        #  Как добавить виджет с прокруткой в ​​область?
-        self.widget = GoodYoutubeGUI()
-        self.gridLayout.addWidget(self.widget)
-
-    def addWidget(self):
-        #  Как добавить виджет с прокруткой в ​​область?
-        self.widget = GoodYoutubeGUI()
-        self.gridLayout.addWidget(self.widget)
 
 
 if __name__ == "__main__":
