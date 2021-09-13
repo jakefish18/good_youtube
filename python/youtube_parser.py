@@ -13,21 +13,21 @@ class YouTubeChannelsParser():
     def parse(self):
         """Основная функция парсера, которая возвращает список видео."""
         channel_ids = self.get_channels_ids(self.get_channels_urls())
-        video_links = []
+        video_links_and_info = []
         for channel_id in channel_ids:
             channel_id = channel_id.strip()
-            video_links.extend(self.get_all_video_from_channel(channel_id))
-        random.shuffle(video_links)
-        return video_links
+            video_links_and_info.extend(self.get_all_video_from_channel(channel_id))
+        random.shuffle(video_links_and_info)
+        return video_links_and_info
 
-    def get_video_prewiew(self, video_links):
-        """Получение ссылок на превью для скачивания."""
-        for link in video_links:
-            video_id = link.split('=')[1]
-            url = f"https://www.googleapis.com/youtube/v3/videos?id={video_id}&key={self.API_KEY}"
-            inp = urllib.request.urlopen(url)
-            resp = json.load(inp)
-            img_url = resp["videos"]["snippet"]["thumbnails"]["default"] 
+    # def get_video_prewiew(self, video_links_and_info):
+    #     """Получение ссылок на превью для скачивания."""
+    #     for link in video_links_and_info:
+    #         video_id = link.split('=')[1]
+    #         url = f"https://www.googleapis.com/youtube/v3/videos?id={video_id}&key={self.API_KEY}"
+    #         inp = urllib.request.urlopen(url)
+    #         resp = json.load(inp)
+    #         img_url = resp["videos"]["snippet"]["thumbnails"]["default"] 
             
 
 
@@ -52,12 +52,16 @@ class YouTubeChannelsParser():
 
         url = base_search_url + f"key={self.API_KEY}&channelId={channel_id}&part=snippet,id&order=date&maxResults=5"
 
-        video_links = []
+        video_links_and_info = []
 
         inp = urllib.request.urlopen(url)
         resp = json.load(inp)
         for i in resp['items']:
             if i['id']['kind'] == "youtube#video":
-                video_links.append(base_video_url + i['id']['videoId'])
+                video_links_and_info.append([base_video_url + i['id']['videoId'],
+                                    i['id']['videoId'],
+                                    i['snippet']['title'],
+                                    i['snippet']['channelTitle'],
+                                    i['snippet']['publishTime']])
 
-        return video_links
+        return video_links_and_info

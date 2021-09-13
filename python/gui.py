@@ -66,11 +66,11 @@ class UrlProvider(QObject):
 class GoodYoutubeGUI(QDialog):
     def __init__(self):
         super().__init__()
-        self.setFixedSize(800, 800)
+        self.setFixedSize(1000, 1000)
         self.setWindowTitle("Good Youtube")
         self.buttons = []
-        self.video_links = YouTubeChannelsParser().parse()
-        self.PATH_TO_IMG = "video_images/yputubebox.jpg"
+        self.video_links_and_info = YouTubeChannelsParser().parse()
+        self.PATH_TO_IMG = "video_images/youtubebox.jpg"
         self.pixmap_img = QPixmap(self.PATH_TO_IMG)
         self.url_provider.finished.connect(self.handle_url_finished)
         self.generate_content()
@@ -85,7 +85,7 @@ class GoodYoutubeGUI(QDialog):
 
     def generate_buttons_info(self):
         buttons_info = {}
-        for link in self.video_links:
+        for link in self.video_links_and_info:
             button = QPushButton("Открыть видео", self)
             buttons_info[button] = link
 
@@ -96,9 +96,18 @@ class GoodYoutubeGUI(QDialog):
         for button, link in self.generate_buttons_info().items():
             lbl = QLabel(self)
             lbl.setPixmap(self.pixmap_img)
-            lbl.move(0, pos_y * 100)
-            button.clicked.connect(lambda checked, link=link: self.open_video(link))
-            button.move(100, pos_y * 100)
+            lbl.move(0, 150 * pos_y)
+            lbl = QLabel(self)
+            lbl.setText(link[2])
+            lbl.move(100, 150 * pos_y)
+            lbl = QLabel(self)
+            lbl.setText(link[3])
+            lbl.move(100, 20 + 150 * pos_y)
+            lbl = QLabel(self)
+            lbl.setText(self.get_date_in_words(link[4]))
+            lbl.move(100, 40 + 150 * pos_y)
+            button.clicked.connect(lambda checked, link=link[0]: self.open_video(link))
+            button.move(100, 60 + pos_y * 150)
             pos_y += 1
 
     def open_video(self, url):
@@ -108,6 +117,26 @@ class GoodYoutubeGUI(QDialog):
         self.player_manager.set_media(url)
         self.player_manager.play()
 
+    def get_date_in_words(self, date):
+        """Получение из такого 2021-08-27 такое 27 августа 2021 года."""
+        date = date.split('T')[0]
+        date = date.split('-')
+        digits_to_words = {
+            "01": "января",
+            "02": "февраля",
+            "03": "марта",
+            "04": "апреля",
+            "05": "мая",
+            "06": "июня",
+            "07": "июля",
+            "08": "августа",
+            "09": "сентября",
+            "10": "октября",
+            "11": "ноября",
+            "12": "декабря"
+        }
+        result = f"{date[2]} {digits_to_words[date[1]]} {date[0]} года"
+        return result
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
