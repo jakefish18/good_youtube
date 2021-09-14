@@ -66,7 +66,6 @@ class UrlProvider(QObject):
 class GoodYoutubeGUI(QDialog):
     def __init__(self):
         super().__init__()
-        self.show()
         self.setFixedSize(1000, 1000)
         self.setWindowTitle("Good Youtube")
         self.buttons = []

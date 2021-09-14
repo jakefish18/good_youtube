@@ -3,6 +3,7 @@ import random
 import urllib.request
 import os
 import requests
+import shutil
 
 
 class YouTubeChannelsParser():
@@ -25,18 +26,18 @@ class YouTubeChannelsParser():
     def get_videos_prewiew(self, video_links_and_info):
         """Получение ссылок на превью для скачивания."""
         order = 1
-        os.mkdir('temp') 
+        #Если папка с превьюшками уже есть, она удаляется.
+        try:
+            os.mkdir('temp') 
+        except FileExistsError:
+            shutil.rmtree('temp')
+            os.mkdir('temp')
+
         for link in video_links_and_info:
             video_id = link[1]
             img_url = f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"
             img_data = requests.get(img_url, allow_redirects=True)
-            # inp = urllib.request.urlopen(url)
-            # resp = json.load(inp)
-            # #Получение превьюшки из json.
-            # for i in resp['items']:
-            #     if i['kind'] == "youtube#video":
-            #         img_url = i["snippet"]["thumbnails"]["url"]
-            # img_data = urllib.request.get(img_url).content
+
             with open(f'temp/{order}.jpg', 'wb') as handler:
                 handler.write(img_data.content)
             order += 1
