@@ -66,12 +66,13 @@ class UrlProvider(QObject):
 class GoodYoutubeGUI(QDialog):
     def __init__(self):
         super().__init__()
+        self.show()
         self.setFixedSize(1000, 1000)
         self.setWindowTitle("Good Youtube")
         self.buttons = []
-        self.video_links_and_info = YouTubeChannelsParser().parse()
-        self.PATH_TO_IMG = "video_images/youtubebox.jpg"
-        self.pixmap_img = QPixmap(self.PATH_TO_IMG)
+        youtube_parser = YouTubeChannelsParser()
+        self.video_links_and_info = youtube_parser.parse()
+        youtube_parser.get_videos_prewiew(self.video_links_and_info)
         self.url_provider.finished.connect(self.handle_url_finished)
         self.generate_content()
 
@@ -92,22 +93,25 @@ class GoodYoutubeGUI(QDialog):
         return buttons_info
 
     def generate_content(self):
-        pos_y = 0
+        pos_y = 0 #Порядковый номер каждого блока видео.
         for button, link in self.generate_buttons_info().items():
+            #Создание пиксмапа превью.
+            path_to_prewiew = f"temp/{pos_y + 1}.jpg"
+            pixmap_img = QPixmap(path_to_prewiew)
             lbl = QLabel(self)
-            lbl.setPixmap(self.pixmap_img)
-            lbl.move(0, 150 * pos_y)
+            lbl.setPixmap(pixmap_img)
+            lbl.move(0, 200 * pos_y)
             lbl = QLabel(self)
             lbl.setText(link[2])
-            lbl.move(100, 150 * pos_y)
+            lbl.move(320, 200 * pos_y)
             lbl = QLabel(self)
             lbl.setText(link[3])
-            lbl.move(100, 20 + 150 * pos_y)
+            lbl.move(320, 20 + 200 * pos_y)
             lbl = QLabel(self)
             lbl.setText(self.get_date_in_words(link[4]))
-            lbl.move(100, 40 + 150 * pos_y)
+            lbl.move(320, 40 + 200 * pos_y)
             button.clicked.connect(lambda checked, link=link[0]: self.open_video(link))
-            button.move(100, 60 + pos_y * 150)
+            button.move(320, 60 + pos_y * 200)
             pos_y += 1
 
     def open_video(self, url):
@@ -160,7 +164,8 @@ class ScrollWidget(QWidget):
 
         self.widget = GoodYoutubeGUI()
         self.gridLayout.addWidget(self.widget)
-        self.setGeometry(700, 200, 1000, 1000)        
+        window_height = len(self.widget.video_links_and_info) * 320
+        self.setGeometry(700, 200, 1000, window_height)        
 
 
 if __name__ == "__main__":

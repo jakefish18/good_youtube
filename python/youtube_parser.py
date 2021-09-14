@@ -1,6 +1,8 @@
 import json
 import random
 import urllib.request
+import os
+import requests
 
 
 class YouTubeChannelsParser():
@@ -20,15 +22,25 @@ class YouTubeChannelsParser():
         random.shuffle(video_links_and_info)
         return video_links_and_info
 
-    # def get_video_prewiew(self, video_links_and_info):
-    #     """Получение ссылок на превью для скачивания."""
-    #     for link in video_links_and_info:
-    #         video_id = link.split('=')[1]
-    #         url = f"https://www.googleapis.com/youtube/v3/videos?id={video_id}&key={self.API_KEY}"
-    #         inp = urllib.request.urlopen(url)
-    #         resp = json.load(inp)
-    #         img_url = resp["videos"]["snippet"]["thumbnails"]["default"] 
-            
+    def get_videos_prewiew(self, video_links_and_info):
+        """Получение ссылок на превью для скачивания."""
+        order = 1
+        os.mkdir('temp') 
+        for link in video_links_and_info:
+            video_id = link[1]
+            img_url = f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"
+            img_data = requests.get(img_url, allow_redirects=True)
+            # inp = urllib.request.urlopen(url)
+            # resp = json.load(inp)
+            # #Получение превьюшки из json.
+            # for i in resp['items']:
+            #     if i['kind'] == "youtube#video":
+            #         img_url = i["snippet"]["thumbnails"]["url"]
+            # img_data = urllib.request.get(img_url).content
+            with open(f'temp/{order}.jpg', 'wb') as handler:
+                handler.write(img_data.content)
+            order += 1
+
 
 
     def get_channels_urls(self):
