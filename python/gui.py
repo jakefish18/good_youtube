@@ -66,11 +66,11 @@ class UrlProvider(QObject):
 class GoodYoutubeGUI(QDialog):
     def __init__(self):
         super().__init__()
-        self.setFixedSize(1000, 1000)
         self.setWindowTitle("Good Youtube")
         self.buttons = []
         youtube_parser = YouTubeChannelsParser()
         self.video_links_and_info = youtube_parser.parse()
+        self.setFixedHeight(len(self.video_links_and_info) * (180 + 20))
         youtube_parser.get_videos_prewiew(self.video_links_and_info)
         self.url_provider.finished.connect(self.handle_url_finished)
         self.generate_content()
