@@ -16,8 +16,10 @@ class PlayerManager(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.window = QWidget()
+        print('test1')
         if sys.platform.startswith("linux"):  # for Linux using the X Server
             self.player.set_xwindow(self.window.winId())
+            print('test')
         elif sys.platform == "win32":  # for Windows
             self.player.set_hwnd(self.window.winId())
         elif sys.platform == "darwin":  # for MacOS
@@ -70,12 +72,12 @@ class GoodYoutubeGUI(QDialog):
         self.buttons = []
         youtube_parser = YouTubeChannelsParser()
         self.video_links_and_info = youtube_parser.parse()
-        self.setFixedHeight(len(self.video_links_and_info) * (180 + 20))
+        self.setFixedHeight(len(self.video_links_and_info) * (180 + 20)) #Установка высоты виджета. Она зависит от количества видео. 
         youtube_parser.get_videos_prewiew(self.video_links_and_info)
         self.url_provider.finished.connect(self.handle_url_finished)
         self.generate_content()
 
-    @cached_property
+    # @cached_property
     def player_manager(self):
         return PlayerManager()
 
@@ -117,8 +119,9 @@ class GoodYoutubeGUI(QDialog):
         self.url_provider.find_url(url)
 
     def handle_url_finished(self, url):
-        self.player_manager.set_media(url)
-        self.player_manager.play()
+        self.player_manager_var = self.player_manager()
+        self.player_manager_var.set_media(url)
+        self.player_manager_var.play()
 
     def get_date_in_words(self, date):
         """Получение из такого 2021-08-27 такое 27 августа 2021 года."""
