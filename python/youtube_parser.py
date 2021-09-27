@@ -2,16 +2,17 @@ import json
 import random
 import urllib.request
 import os
+import sys
 import requests
 import shutil
 
 
 class YouTubeChannelsParser():
     """Класс парсера каналов в файле ютуба."""
-    def __init__(self):
+    def __init__(self, api_key):
         """Инициализация пути к файлу с url, ключа для доступа в юутб, класс для выкачки данных."""
         self.PATH_TO_URLS = "txt_files/urls_to_channels.txt"
-        self.API_KEY = "AIzaSyDPRxayW_cIe_8mkhtW-dsknFS46H6opnA"
+        self.API_KEY = api_key
 
     def parse(self):
         """Основная функция парсера, которая возвращает список видео."""
@@ -66,8 +67,12 @@ class YouTubeChannelsParser():
         url = base_search_url + f"key={self.API_KEY}&channelId={channel_id}&part=snippet,id&order=date&maxResults=5"
 
         video_links_and_info = []
+        #Проверка на валедабельность ключа.
+        try:
+            inp = urllib.request.urlopen(url)
+        except:
+            return []
 
-        inp = urllib.request.urlopen(url)
         resp = json.load(inp)
         for i in resp['items']:
             if i['id']['kind'] == "youtube#video":

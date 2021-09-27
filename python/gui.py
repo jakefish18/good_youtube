@@ -7,7 +7,7 @@ import pafy
 import vlc
 
 from PyQt5.QtCore import pyqtSignal, QEvent, QObject, QRect
-from PyQt5.QtWidgets import QApplication, QDialog, QPushButton, QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QGridLayout
+from PyQt5.QtWidgets import QApplication, QDialog, QLineEdit, QMainWindow, QMessageBox, QPushButton, QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QGridLayout, QAction
 from  PyQt5.QtGui import QPixmap
 
 from youtube_parser import YouTubeChannelsParser
@@ -16,10 +16,8 @@ class PlayerManager(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.window = QWidget()
-        print('test1')
         if sys.platform.startswith("linux"):  # for Linux using the X Server
             self.player.set_xwindow(self.window.winId())
-            print('test')
         elif sys.platform == "win32":  # for Windows
             self.player.set_hwnd(self.window.winId())
         elif sys.platform == "darwin":  # for MacOS
@@ -66,18 +64,18 @@ class UrlProvider(QObject):
 
 
 class GoodYoutubeGUI(QDialog):
-    def __init__(self):
+    def __init__(self, api_key):
         super().__init__()
         self.setWindowTitle("Good Youtube")
         self.buttons = []
-        youtube_parser = YouTubeChannelsParser()
+        youtube_parser = YouTubeChannelsParser(api_key)
         self.video_links_and_info = youtube_parser.parse()
-        self.setFixedHeight(len(self.video_links_and_info) * (180 + 20)) #Установка высоты виджета. Она зависит от количества видео. 
+        self.setFixedHeight(len(self.video_links_and_info) * (180 + 20))
         youtube_parser.get_videos_prewiew(self.video_links_and_info)
         self.url_provider.finished.connect(self.handle_url_finished)
         self.generate_content()
 
-    # @cached_property
+    @cached_property
     def player_manager(self):
         return PlayerManager()
 
@@ -119,9 +117,8 @@ class GoodYoutubeGUI(QDialog):
         self.url_provider.find_url(url)
 
     def handle_url_finished(self, url):
-        self.player_manager_var = self.player_manager()
-        self.player_manager_var.set_media(url)
-        self.player_manager_var.play()
+        self.player_manager.set_media(url)
+        self.player_manager.play()
 
     def get_date_in_words(self, date):
         """Получение из такого 2021-08-27 такое 27 августа 2021 года."""
@@ -144,12 +141,79 @@ class GoodYoutubeGUI(QDialog):
         result = f"{date[2]} {digits_to_words[date[1]]} {date[0]} года"
         return result
 
-class ScrollWidget(QWidget):      
-    def __init__(self, parent=None):
-        super(ScrollWidget, self).__init__(parent)
-        self.initUi()
 
-    def initUi(self):
+class WindowToSetKey(QDialog):
+    """Диалоговое окно для ввода ключа апи."""
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Key Editor")
+        self.setFixedSize(350, 110)
+        self.api_key = 0
+        #Подчказка для ввода текста.
+        self.prompt = QLabel(self)
+        self.prompt.setText("Введите ключ апи, чтобы смортеть видео:")
+        self.prompt.move(10, 10)
+        #Поле для ввода ключа.
+        self.led_api_key = QLineEdit(self)
+        self.led_api_key.move(10, 30)
+        #Кнопка для сохранения ключа.
+        self.btn_to_set_api = QPushButton("Поставить ключ", self)
+        self.btn_to_set_api.clicked.connect(self.get_api_key)
+        self.btn_to_set_api.move(10, 60)
+        #Ссылка с гайдом для получения ключа.
+        self.url_to_guide = QLabel(self)
+        self.url_to_guide.setText("<a href=\"https://www.youtube.com/watch?v=pBrbZGF3HEs\">Как получить ключ апи?</a>")
+        self.url_to_guide.setOpenExternalLinks(True)
+        self.url_to_guide.move(10, 90)
+        self.show()        
+
+    def get_api_key(self):
+        """Получение ключа из поля для запроса."""
+        self.api_key = self.led_api_key.text()
+        print(self.api_key)
+        #Запись в файл ключа.
+        with open("txt_files/api_key.txt", 'w') as file:
+            file.write(self.api_key)
+
+        self.destroy()
+    
+
+class MainMenu(QWidget):
+    """Меню в котором кнопка для того, чтобы поставить ключ и запуска основного окна."""
+    def __init__(self):
+        super().__init__()
+        self.setFixedSize(600, 600)
+        self.btn_to_start = QPushButton("Запустить", self)
+        self.btn_to_start.setFixedSize(300, 100)
+        self.btn_to_start.clicked.connect(self.open_main_content)
+        self.btn_to_start.move(150, 200)
+        self.btn_to_set_key = QPushButton("Поставить ключ", self)
+        self.btn_to_set_key.setFixedSize(300, 100)
+        self.btn_to_set_key.clicked.connect(self.open_set_key_win)
+        self.btn_to_set_key.move(150, 300)
+    
+    def open_set_key_win(self):
+        """Открытия окна для ввода ключа апи."""
+        self.win = WindowToSetKey()
+    
+    def open_main_content(self):
+        """Получение ключа и инициализация контента"""
+        with open("txt_files/api_key.txt", 'r') as file:
+            api_key = file.readline()
+
+        if api_key == "пустой":
+            message = QMessageBox.warning(self, 'Поставьте ключ апи!', 'Поставьте ключ апи')
+        else:
+            self.destroy()
+            self.win_goodtube = ScrollWidget(api_key)
+            self.win_goodtube.show()
+
+class ScrollWidget(QWidget):      
+    def __init__(self, api_key, parent=None):
+        super(ScrollWidget, self).__init__(parent)
+        self.initUi(api_key)
+
+    def initUi(self, api_key):
         self.layoutV = QVBoxLayout(self)
 
         self.area = QScrollArea(self)
@@ -164,7 +228,7 @@ class ScrollWidget(QWidget):
         self.area.setWidget(self.scrollAreaWidgetContents)
         self.layoutV.addWidget(self.area)
 
-        self.widget = GoodYoutubeGUI()
+        self.widget = GoodYoutubeGUI(api_key)
         self.gridLayout.addWidget(self.widget)
         window_height = len(self.widget.video_links_and_info) * 320
         self.setGeometry(700, 200, 1000, window_height)        
@@ -172,6 +236,6 @@ class ScrollWidget(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = ScrollWidget()
+    window = MainMenu()
     window.show()
     sys.exit(app.exec_())
