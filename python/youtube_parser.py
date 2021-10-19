@@ -6,7 +6,6 @@ import sys
 import requests
 import shutil
 
-
 class YouTubeChannelsParser():
     """Класс парсера каналов в файле ютуба."""
     def __init__(self, api_key):
@@ -65,7 +64,6 @@ class YouTubeChannelsParser():
         base_search_url = "https://www.googleapis.com/youtube/v3/search?"
 
         url = base_search_url + f"key={self.API_KEY}&channelId={channel_id}&part=snippet,id&order=date&maxResults=5"
-
         video_links_and_info = []
         #Проверка на валедабельность ключа.
         try:

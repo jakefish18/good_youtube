@@ -1,13 +1,14 @@
 from functools import cached_property
 import sys
 import threading
+import psycopg2
 
 import pafy
 
 import vlc
 
 from PyQt5.QtCore import pyqtSignal, QEvent, QObject, QRect
-from PyQt5.QtWidgets import QApplication, QDialog, QLineEdit, QMainWindow, QMessageBox, QPushButton, QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QGridLayout, QAction
+from PyQt5.QtWidgets import QApplication, QDialog, QInputDialog, QLineEdit, QMainWindow, QMessageBox, QPushButton, QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QGridLayout, QAction
 from  PyQt5.QtGui import QPixmap
 
 from youtube_parser import YouTubeChannelsParser
@@ -75,7 +76,6 @@ class GoodYoutubeGUI(QDialog):
         self.url_provider.finished.connect(self.handle_url_finished)
         self.generate_content()
 
-    @cached_property
     def player_manager(self):
         return PlayerManager()
 
@@ -117,6 +117,7 @@ class GoodYoutubeGUI(QDialog):
         self.url_provider.find_url(url)
 
     def handle_url_finished(self, url):
+        self.player_manager = PlayerManager()
         self.player_manager.set_media(url)
         self.player_manager.play()
 
@@ -142,70 +143,178 @@ class GoodYoutubeGUI(QDialog):
         return result
 
 
-class WindowToSetKey(QDialog):
+class WindowToRegister(QDialog):
     """Диалоговое окно для ввода ключа апи."""
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Key Editor")
-        self.setFixedSize(350, 110)
+        self.setWindowTitle("Registration")
+        self.setFixedSize(400, 200)
         self.api_key = 0
         #Подчказка для ввода текста.
         self.prompt = QLabel(self)
-        self.prompt.setText("Введите ключ апи, чтобы смортеть видео:")
+        self.prompt.setText("Введите ключ апи, логин и пароль, чтобы смортеть видео:")
         self.prompt.move(10, 10)
+        #Поле для ввода логина.
+        self.led_login = QLineEdit(self)
+        self.led_login.setPlaceholderText('Логин...')
+        self.led_login.move(10, 30)
+        #Поле для ввода пароля.
+        self.led_password = QLineEdit(self)
+        self.led_password.setPlaceholderText('Пароль...')
+        self.led_password.setEchoMode(QLineEdit.Password)
+        self.led_password.move(10, 60)
         #Поле для ввода ключа.
         self.led_api_key = QLineEdit(self)
-        self.led_api_key.move(10, 30)
+        self.led_api_key.setPlaceholderText('Ключ апи...')
+        self.led_api_key.setEchoMode(QLineEdit.Password)
+        self.led_api_key.move(10, 90)
         #Кнопка для сохранения ключа.
-        self.btn_to_set_api = QPushButton("Поставить ключ", self)
-        self.btn_to_set_api.clicked.connect(self.get_api_key)
-        self.btn_to_set_api.move(10, 60)
+        self.btn_to_set_api = QPushButton("Зарегистрироваться", self)
+        self.btn_to_set_api.clicked.connect(self.set_user)
+        self.btn_to_set_api.move(10, 120)
         #Ссылка с гайдом для получения ключа.
         self.url_to_guide = QLabel(self)
         self.url_to_guide.setText("<a href=\"https://www.youtube.com/watch?v=pBrbZGF3HEs\">Как получить ключ апи?</a>")
         self.url_to_guide.setOpenExternalLinks(True)
-        self.url_to_guide.move(10, 90)
+        self.url_to_guide.move(10, 150)
         self.show()        
 
-    def get_api_key(self):
+    def set_user(self):
         """Получение ключа из поля для запроса."""
-        self.api_key = self.led_api_key.text()
-        print(self.api_key)
-        #Запись в файл ключа.
-        with open("txt_files/api_key.txt", 'w') as file:
-            file.write(self.api_key)
+        login = self.led_login.text()
+        password = self.led_password.text()
+        api_key = self.led_api_key.text()
 
-        self.destroy()
-    
+        try:
+            connection = psycopg2.connect(
+                host="127.0.0.1",
+                user="postgres",
+                password="Insaff2006",
+                database="postgres" 
+             )
+            with connection.cursor() as cursor:
+                # Проверка на наличие в бд
+                cursor.execute(f"select * from users where login='{login}'")
+                if cursor.fetchall():
+                    pass
+                else:
+                    cursor.execute(f"INSERT INTO users (login, password, api_key) VALUES ('{login}', '{password}', '{api_key}');")
+
+
+        except Exception as _ex:
+            print("[ERROR] Error while working with PostgreSQL", _ex)
+        finally:
+            if connection:
+                connection.commit()
+                connection.close()
+                self.destroy()
+                print("[INFO] PostgreSQL connection closed")
+
+class WindowToAuth(QDialog):
+    """Окна входа в аккаунт."""
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Registration")
+        self.setFixedSize(400, 130)
+        self.api_key = 0
+        #Подчказка для ввода текста.
+        self.prompt = QLabel(self)
+        self.prompt.setText("Введите логин и пароль, чтобы войти в аккаунт:")
+        self.prompt.move(10, 10)
+        #Поле для ввода логина.
+        self.led_login = QLineEdit(self)
+        self.led_login.setPlaceholderText('Логин...')
+        self.led_login.move(10, 30)
+        #Поле для ввода пароля.
+        self.led_password = QLineEdit(self)
+        self.led_password.setPlaceholderText('Пароль...')
+        self.led_password.setEchoMode(QLineEdit.Password)
+        self.led_password.move(10, 60)
+        #Кнопка для входа.
+        self.btn_to_auth = QPushButton("Войти", self)
+        self.btn_to_auth.clicked.connect(self.auth)
+        self.btn_to_auth.move(10, 90)
+        self.show()
+
+    def auth(self):
+        """Авторизация."""
+        login = self.led_login.text()
+        password = self.led_password.text()  
+
+        try:
+            connection = psycopg2.connect(
+                host="127.0.0.1",
+                user="postgres",
+                password="Insaff2006",
+                database="postgres" 
+            )
+            with connection.cursor() as cursor:
+                #Проверка логина и пароля, что они в одной строке.
+                try:
+                    cursor.execute(f"select * from users where login='{login}'")
+                    row = cursor.fetchall()[0]
+                    if row[2] == password:
+                        #Флаги входа.
+                        global auth, auth_api_key
+                        auth = True
+                        auth_api_key = row[3]
+
+                    else:
+                        #Окно с уведомлением о неправильном лгине или пароле.
+                        message = QMessageBox.warning(self, "Ошибка!", "Неправильный логин или пароль!")
+
+                except:
+                    message = QMessageBox.warning(self, "Ошибка!", "Неправильный логин или пароль!")
+
+        except Exception as _ex:
+            print("[ERROR] Error while working with PostgreSQL", _ex)
+
+        finally:
+            if connection:
+                connection.commit()
+                connection.close()
+                self.destroy()
+                print("[INFO] PostgreSQL connection closed")    
 
 class MainMenu(QWidget):
     """Меню в котором кнопка для того, чтобы поставить ключ и запуска основного окна."""
     def __init__(self):
+        global auth_api_key, auth
+        auth_api_key = 0
+        auth = False 
         super().__init__()
         self.setFixedSize(600, 600)
-        self.btn_to_start = QPushButton("Запустить", self)
-        self.btn_to_start.setFixedSize(300, 100)
-        self.btn_to_start.clicked.connect(self.open_main_content)
-        self.btn_to_start.move(150, 200)
-        self.btn_to_set_key = QPushButton("Поставить ключ", self)
-        self.btn_to_set_key.setFixedSize(300, 100)
-        self.btn_to_set_key.clicked.connect(self.open_set_key_win)
-        self.btn_to_set_key.move(150, 300)
-    
-    def open_set_key_win(self):
-        """Открытия окна для ввода ключа апи."""
-        self.win = WindowToSetKey()
+        #Кнопка регистрации.
+        self.btn_register = QPushButton("Регистрация", self)
+        self.btn_register.setFixedSize(150, 30)
+        self.btn_register.clicked.connect(self.open_registration_win)
+        self.btn_register.move(450, 0)
+        #Кнопка входа.
+        self.btn_autorize = QPushButton("Войти", self)
+        self.btn_autorize.setFixedSize(150, 30)
+        self.btn_autorize.clicked.connect(self.open_auth_win)
+        self.btn_autorize.move(299, 0)
+        #Кнопка запуска.
+        self.btn_run = QPushButton("Запустить", self)
+        self.btn_run.setFixedSize(150, 50)
+        self.btn_run.clicked.connect(self.open_main_content)
+        self.btn_run.move(225, 275)
+
+    def open_registration_win(self):
+        """Открытия окна для регистрации."""
+        self.win = WindowToRegister()
+
+    def open_auth_win(self):
+        """Открытие окна для входа."""
+        self.win = WindowToAuth()
     
     def open_main_content(self):
         """Получение ключа и инициализация контента"""
-        with open("txt_files/api_key.txt", 'r') as file:
-            api_key = file.readline()
-
-        if api_key == "пустой":
-            message = QMessageBox.warning(self, 'Поставьте ключ апи!', 'Поставьте ключ апи')
+        if auth_api_key == 0:
+            message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
         else:
             self.destroy()
-            self.win_goodtube = ScrollWidget(api_key)
+            self.win_goodtube = ScrollWidget(auth_api_key)
             self.win_goodtube.show()
 
 class ScrollWidget(QWidget):      
@@ -232,7 +341,6 @@ class ScrollWidget(QWidget):
         self.gridLayout.addWidget(self.widget)
         window_height = len(self.widget.video_links_and_info) * 320
         self.setGeometry(700, 200, 1000, window_height)        
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
