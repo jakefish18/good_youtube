@@ -5,13 +5,16 @@ import os
 import sys
 import requests
 import shutil
+import psycopg2
+
+from html import unescape
 
 class YouTubeChannelsParser():
     """Класс парсера каналов в файле ютуба."""
-    def __init__(self, api_key):
+    def __init__(self, api_key, auth_id):
         """Инициализация пути к файлу с url, ключа для доступа в юутб, класс для выкачки данных."""
-        self.PATH_TO_URLS = "txt_files/urls_to_channels.txt"
         self.API_KEY = api_key
+        self.auth_id = auth_id
 
     def parse(self):
         """Основная функция парсера, которая возвращает список видео."""
@@ -46,8 +49,29 @@ class YouTubeChannelsParser():
 
     def get_channels_urls(self):
         """Получение пяти последних видео с выбранных каналов в файле."""
-        with open(self.PATH_TO_URLS, 'r') as file:
-            urls_to_channels = file.readlines()
+        urls_to_channels = []
+        try:
+            connection = psycopg2.connect(
+                host="ec2-54-170-163-224.eu-west-1.compute.amazonaws.com",
+                user="uvdhbagmtheqly",
+                password="898ffb10b3a5fbdf59a98f25e7f03ac3ec8a1933edbdb8fde5b262a936f43ae3",
+                database="d7kkv7tv2pire0" 
+             )
+            #Собрать все ссылки пользователя.
+            with connection.cursor() as cursor:
+                cursor.execute(f"select channel_url from channels where id='{self.auth_id}'")
+                for row in cursor.fetchall():
+                    urls_to_channels.append(row[0])
+
+        except Exception as _ex:
+            print("[ERROR] Error while working with PostgreSQL", _ex)
+
+        finally:
+            if connection:
+                connection.commit()
+                connection.close()
+                print("[INFO] PostgreSQL connection closed")
+
         return urls_to_channels
 
     def get_channels_ids(self, urls_to_channels):
@@ -76,7 +100,7 @@ class YouTubeChannelsParser():
             if i['id']['kind'] == "youtube#video":
                 video_links_and_info.append([base_video_url + i['id']['videoId'],
                                     i['id']['videoId'],
-                                    i['snippet']['title'],
+                                    unescape(i['snippet']['title']),
                                     i['snippet']['channelTitle'],
                                     i['snippet']['publishTime']])
 

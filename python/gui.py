@@ -69,7 +69,7 @@ class GoodYoutubeGUI(QDialog):
         super().__init__()
         self.setWindowTitle("Good Youtube")
         self.buttons = []
-        youtube_parser = YouTubeChannelsParser(api_key)
+        youtube_parser = YouTubeChannelsParser(api_key, auth_id)
         self.video_links_and_info = youtube_parser.parse()
         self.setFixedHeight(len(self.video_links_and_info) * (180 + 20))
         youtube_parser.get_videos_prewiew(self.video_links_and_info)
@@ -187,16 +187,16 @@ class WindowToRegister(QDialog):
 
         try:
             connection = psycopg2.connect(
-                host="127.0.0.1",
-                user="postgres",
-                password="Insaff2006",
-                database="postgres" 
+                host="ec2-54-170-163-224.eu-west-1.compute.amazonaws.com",
+                user="uvdhbagmtheqly",
+                password="898ffb10b3a5fbdf59a98f25e7f03ac3ec8a1933edbdb8fde5b262a936f43ae3",
+                database="d7kkv7tv2pire0" 
              )
             with connection.cursor() as cursor:
                 # Проверка на наличие в бд
                 cursor.execute(f"select * from users where login='{login}'")
                 if cursor.fetchall():
-                    pass
+                    message = QMessageBox.warning(self, 'Ошибка!', 'Данный логин уже существует!')
                 else:
                     cursor.execute(f"INSERT INTO users (login, password, api_key) VALUES ('{login}', '{password}', '{api_key}');")
 
@@ -243,11 +243,11 @@ class WindowToAuth(QDialog):
 
         try:
             connection = psycopg2.connect(
-                host="127.0.0.1",
-                user="postgres",
-                password="Insaff2006",
-                database="postgres" 
-            )
+                host="ec2-54-170-163-224.eu-west-1.compute.amazonaws.com",
+                user="uvdhbagmtheqly",
+                password="898ffb10b3a5fbdf59a98f25e7f03ac3ec8a1933edbdb8fde5b262a936f43ae3",
+                database="d7kkv7tv2pire0" 
+             )
             with connection.cursor() as cursor:
                 #Проверка логина и пароля, что они в одной строке.
                 try:
@@ -255,8 +255,9 @@ class WindowToAuth(QDialog):
                     row = cursor.fetchall()[0]
                     if row[2] == password:
                         #Флаги входа.
-                        global auth, auth_api_key
+                        global auth, auth_id, auth_api_key
                         auth = True
+                        auth_id = row[0]
                         auth_api_key = row[3]
 
                     else:
@@ -276,10 +277,58 @@ class WindowToAuth(QDialog):
                 self.destroy()
                 print("[INFO] PostgreSQL connection closed")    
 
+class WinAddChannel(QDialog):
+    """Окно для ввода канала."""
+    def __init__(self, auth_id):
+        """Инициализация окна."""
+        super().__init__()
+        self.auth_id = auth_id
+        self.setWindowTitle("Add channel")
+        self.setFixedSize(460, 160)
+        self.prompt = QLabel(self)
+        self.prompt.setText('Введите ссылку канала, видео которого\n вы хотите смотреть. Пример:\nhttps://www.youtube.com/channel/UCMcC_43zGHttf9bY-xJOTwA')
+        self.prompt.move(10, 10)
+        self.led_channel_url = QLineEdit(self)
+        self.led_channel_url.setFixedWidth(445)
+        self.led_channel_url.move(10, 75)
+        self.btn_add_channel = QPushButton("Добавить канал", self)
+        self.btn_add_channel.clicked.connect(self.add_channel)
+        self.btn_add_channel.move(10, 110)
+        self.show()
+    
+    def add_channel(self):
+        """Добавления данных в таблицу."""
+        channel_url = self.led_channel_url.text()
+        try:
+            connection = psycopg2.connect(
+                host="ec2-54-170-163-224.eu-west-1.compute.amazonaws.com",
+                user="uvdhbagmtheqly",
+                password="898ffb10b3a5fbdf59a98f25e7f03ac3ec8a1933edbdb8fde5b262a936f43ae3",
+                database="d7kkv7tv2pire0" 
+             )
+             #Добавления ссылки в таблицу.
+            with connection.cursor() as cursor:
+                cursor.execute(f"select * from channels where channel_url='{channel_url}' and id='{self.auth_id}'")
+                if cursor.fetchall():
+                    message = QMessageBox(self, 'Ошибка!', 'Этот канал уже добавлен!')
+                else:
+                    cursor.execute(f"INSERT INTO channels (id, channel_url) VALUES ('{self.auth_id}', '{channel_url}')")
+
+
+        except Exception as _ex:
+            print("[ERROR] Error while working with PostgreSQL", _ex)
+        finally:
+            if connection:
+                connection.commit()
+                connection.close()
+                self.destroy()
+                print("[INFO] PostgreSQL connection closed")
+
 class MainMenu(QWidget):
     """Меню в котором кнопка для того, чтобы поставить ключ и запуска основного окна."""
     def __init__(self):
-        global auth_api_key, auth
+        global auth, auth_id, auth_api_key
+        auth_id = None
         auth_api_key = 0
         auth = False 
         super().__init__()
@@ -298,7 +347,12 @@ class MainMenu(QWidget):
         self.btn_run = QPushButton("Запустить", self)
         self.btn_run.setFixedSize(150, 50)
         self.btn_run.clicked.connect(self.open_main_content)
-        self.btn_run.move(225, 275)
+        self.btn_run.move(225, 250)
+        #Кнопка добавления канала.
+        self.btn_add_channel = QPushButton("Добавить канал", self)
+        self.btn_add_channel.setFixedSize(150, 50)
+        self.btn_add_channel.clicked.connect(self.open_channel_adding_win)
+        self.btn_add_channel.move(225, 300)
 
     def open_registration_win(self):
         """Открытия окна для регистрации."""
@@ -316,6 +370,14 @@ class MainMenu(QWidget):
             self.destroy()
             self.win_goodtube = ScrollWidget(auth_api_key)
             self.win_goodtube.show()
+        
+    def open_channel_adding_win(self):
+        """Добавление в таблицу с массивом каналов новый канал."""
+        if auth_api_key == 0:
+            message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
+        
+        else:
+            self.win = WinAddChannel(auth_id)
 
 class ScrollWidget(QWidget):      
     def __init__(self, api_key, parent=None):
