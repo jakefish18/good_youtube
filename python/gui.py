@@ -1,7 +1,9 @@
 from functools import cached_property
+from re import S
 import sys
 import threading
 import psycopg2
+import urllib.request
 
 import pafy
 
@@ -185,6 +187,14 @@ class WindowToRegister(QDialog):
         password = self.led_password.text()
         api_key = self.led_api_key.text()
 
+        #Проверка ключа апи на валидабелность на тестовом запросе..
+        try:
+            url = f"https://www.googleapis.com/youtube/v3/search?key={self.API_KEY}&channelId=UCMcC_43zGHttf9bY-xJOTwA&part=snippet,id&order=date&maxResults=5"
+            test = urllib.request.urlopen(url)
+        
+        except:
+            message = QMessageBox.warning(self, 'Ошибка!', 'Не правильный ключ апи!')
+
         try:
             connection = psycopg2.connect(
                 host="ec2-54-170-163-224.eu-west-1.compute.amazonaws.com",
@@ -200,7 +210,6 @@ class WindowToRegister(QDialog):
                 else:
                     cursor.execute(f"INSERT INTO users (login, password, api_key) VALUES ('{login}', '{password}', '{api_key}');")
 
-
         except Exception as _ex:
             print("[ERROR] Error while working with PostgreSQL", _ex)
         finally:
@@ -210,11 +219,12 @@ class WindowToRegister(QDialog):
                 self.destroy()
                 print("[INFO] PostgreSQL connection closed")
 
+
 class WindowToAuth(QDialog):
     """Окна входа в аккаунт."""
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Registration")
+        self.setWindowTitle("Log in")
         self.setFixedSize(400, 130)
         self.api_key = 0
         #Подчказка для ввода текста.
@@ -247,7 +257,7 @@ class WindowToAuth(QDialog):
                 user="uvdhbagmtheqly",
                 password="898ffb10b3a5fbdf59a98f25e7f03ac3ec8a1933edbdb8fde5b262a936f43ae3",
                 database="d7kkv7tv2pire0" 
-             )
+            )
             with connection.cursor() as cursor:
                 #Проверка логина и пароля, что они в одной строке.
                 try:
@@ -279,10 +289,11 @@ class WindowToAuth(QDialog):
 
 class WinAddChannel(QDialog):
     """Окно для ввода канала."""
-    def __init__(self, auth_id):
+    def __init__(self, auth_id, api_key):
         """Инициализация окна."""
         super().__init__()
         self.auth_id = auth_id
+        self.api_key = api_key
         self.setWindowTitle("Add channel")
         self.setFixedSize(460, 160)
         self.prompt = QLabel(self)
@@ -299,6 +310,15 @@ class WinAddChannel(QDialog):
     def add_channel(self):
         """Добавления данных в таблицу."""
         channel_url = self.led_channel_url.text()
+        #Проверка на правильность channel_id при помощи тестового запроса.
+        try:
+            channel_id = channel_url.split('/')[-1] #Получение id в ссылке.
+            url = f"https://www.googleapis.com/youtube/v3/search?key={self.api_key}&channelId={channel_id}&part=snippet,id&order=date&maxResults=5"
+            test = urllib.request.urlopen(url)
+        except:
+            message = QMessageBox.warning(self, 'Ошибка!', 'Неправильная ссылка!')
+            return 1
+
         try:
             connection = psycopg2.connect(
                 host="ec2-54-170-163-224.eu-west-1.compute.amazonaws.com",
@@ -324,6 +344,54 @@ class WinAddChannel(QDialog):
                 self.destroy()
                 print("[INFO] PostgreSQL connection closed")
 
+class WinDelChannel(QDialog):
+    """Класс окна для удаления канала пользователя из таблицы."""
+    def __init__(self, auth):
+        super().__init__()
+        self.auth_id = auth_id
+        self.setWindowTitle("Del channel")
+        self.setFixedSize(600, 600)
+        self.prompt = QLabel(self)
+        self.prompt.setText("Введите ссылку канала, \nкоторую вы добавляли, чтобы удалить её. Пример:\nhttps://www.youtube.com/channel/UCMcC_43zGHttf9bY-xJOTwA")
+        self.prompt.move(10, 10)
+        self.led_channel_url = QLineEdit(self)
+        self.led_channel_url.setFixedWidth(445)
+        self.led_channel_url.move(10, 75)
+        self.btn_del_channel = QPushButton("Удалить канал", self)
+        self.btn_del_channel.clicked.connect(self.del_channel)
+        self.btn_del_channel.move(10, 110)
+        self.show()
+    
+    def del_channel(self):
+        """Удаление канала, который лежит в self.led_channel_url."""
+        channel_url = self.led_channel_url.text()
+
+        try:
+            connection = psycopg2.connect(
+                host="ec2-54-170-163-224.eu-west-1.compute.amazonaws.com",
+                user="uvdhbagmtheqly",
+                password="898ffb10b3a5fbdf59a98f25e7f03ac3ec8a1933edbdb8fde5b262a936f43ae3",
+                database="d7kkv7tv2pire0" 
+            )
+            #Удаление ссылки из таблицы.
+            with connection.cursor() as cursor:
+                cursor.execute(f"select * from channels where id='{self.auth_id}' and channel_url='{channel_url}'")
+                #Проверка на выполнение работы.
+                if cursor.fetchall():
+                    cursor.execute(f"DELETE from channels where id='{self.auth_id}' and channel_url='{channel_url}'")
+                else:
+                    message = QMessageBox.warning(self, "Ошибка!", "Такого канала нет в вашем списке!")
+
+        except Exception as _ex:
+            print("[ERROR] Error while working with PostgreSQL", _ex)
+        finally:
+            if connection:
+                connection.commit()
+                connection.close()
+                self.destroy()
+                print("[INFO] PostgreSQL connection closed")
+
+
 class MainMenu(QWidget):
     """Меню в котором кнопка для того, чтобы поставить ключ и запуска основного окна."""
     def __init__(self):
@@ -333,26 +401,37 @@ class MainMenu(QWidget):
         auth = False 
         super().__init__()
         self.setFixedSize(600, 600)
+        self.setStyleSheet("background: #333; font-size: 17px; font-family: \"sans-serif\"")
         #Кнопка регистрации.
         self.btn_register = QPushButton("Регистрация", self)
         self.btn_register.setFixedSize(150, 30)
+        self.btn_register.setStyleSheet("border-radius: 3px; background: orange; color: white;")
         self.btn_register.clicked.connect(self.open_registration_win)
-        self.btn_register.move(450, 0)
+        self.btn_register.move(449, 1)
         #Кнопка входа.
         self.btn_autorize = QPushButton("Войти", self)
         self.btn_autorize.setFixedSize(150, 30)
+        self.btn_autorize.setStyleSheet("border-radius: 3px; background: orange; color: white;")
         self.btn_autorize.clicked.connect(self.open_auth_win)
-        self.btn_autorize.move(299, 0)
+        self.btn_autorize.move(294, 1)
         #Кнопка запуска.
         self.btn_run = QPushButton("Запустить", self)
         self.btn_run.setFixedSize(150, 50)
+        self.btn_run.setStyleSheet("border-radius: 3px; background: orange; color: white;")
         self.btn_run.clicked.connect(self.open_main_content)
         self.btn_run.move(225, 250)
         #Кнопка добавления канала.
         self.btn_add_channel = QPushButton("Добавить канал", self)
         self.btn_add_channel.setFixedSize(150, 50)
+        self.btn_add_channel.setStyleSheet("border-radius: 3px; background: orange; color: white;")
         self.btn_add_channel.clicked.connect(self.open_channel_adding_win)
-        self.btn_add_channel.move(225, 300)
+        self.btn_add_channel.move(225, 305)
+        #Кнопка удаления канала.
+        self.btn_del_channel = QPushButton("Удалить канал", self)
+        self.btn_del_channel.setFixedSize(150, 50)
+        self.btn_del_channel.setStyleSheet("border-radius: 3px; background: orange; color: white;")
+        self.btn_del_channel.clicked.connect(self.open_channel_deleting_win)
+        self.btn_del_channel.move(225, 360)
 
     def open_registration_win(self):
         """Открытия окна для регистрации."""
@@ -372,12 +451,20 @@ class MainMenu(QWidget):
             self.win_goodtube.show()
         
     def open_channel_adding_win(self):
-        """Добавление в таблицу с массивом каналов новый канал."""
+        """Добавление в таблицу со столбцами каналов новый канал."""
         if auth_api_key == 0:
             message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
         
         else:
-            self.win = WinAddChannel(auth_id)
+            self.win = WinAddChannel(auth_id, auth_api_key)
+    
+    def open_channel_deleting_win(self):
+        """Удаление из таблицы со столбцами каналов введенный канал."""
+        if auth_api_key == 0:
+            message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
+        
+        else:
+            self.win = WinDelChannel(auth_id)
 
 class ScrollWidget(QWidget):      
     def __init__(self, api_key, parent=None):
@@ -408,4 +495,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainMenu()
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())

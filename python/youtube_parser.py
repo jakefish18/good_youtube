@@ -95,12 +95,13 @@ class YouTubeChannelsParser():
         except:
             return []
 
+        print(inp)
         resp = json.load(inp)
         for i in resp['items']:
             if i['id']['kind'] == "youtube#video":
                 video_links_and_info.append([base_video_url + i['id']['videoId'],
                                     i['id']['videoId'],
-                                    unescape(i['snippet']['title']),
+                                    unescape(i['snippet']['title']), #Unescape - названия без &amp; &quot; и т.д.
                                     i['snippet']['channelTitle'],
                                     i['snippet']['publishTime']])
 
