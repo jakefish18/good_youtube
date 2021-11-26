@@ -1,20 +1,27 @@
+import configparser
 import json
 import random
 import urllib.request
 import os
-import sys
 import requests
 import shutil
-import psycopg2
+import keyring
 
 from html import unescape
 
+from table_handlers import ChannelsHandler
+
 class YouTubeChannelsParser():
     """Класс парсера каналов в файле ютуба."""
-    def __init__(self, api_key, auth_id):
+    def __init__(self):
         """Инициализация пути к файлу с url, ключа для доступа в юутб, класс для выкачки данных."""
-        self.API_KEY = api_key
-        self.auth_id = auth_id
+        self.configs = configparser.ConfigParser()
+        self.configs.read('config.ini')
+        login = self.configs['User_info']['login']
+        self.AUTH_ID = self.configs['User_info']['id']
+        self.API_KEY = keyring.get_password('good_tube', login)
+        self.channels_handler = ChannelsHandler()
+
 
     def parse(self):
         """Основная функция парсера, которая возвращает список видео."""
@@ -45,33 +52,10 @@ class YouTubeChannelsParser():
                 handler.write(img_data.content)
             order += 1
 
-
-
     def get_channels_urls(self):
-        """Получение пяти последних видео с выбранных каналов в файле."""
-        urls_to_channels = []
-        try:
-            connection = psycopg2.connect(
-                host="ec2-54-170-163-224.eu-west-1.compute.amazonaws.com",
-                user="uvdhbagmtheqly",
-                password="898ffb10b3a5fbdf59a98f25e7f03ac3ec8a1933edbdb8fde5b262a936f43ae3",
-                database="d7kkv7tv2pire0" 
-             )
-            #Собрать все ссылки пользователя.
-            with connection.cursor() as cursor:
-                cursor.execute(f"select channel_url from channels where id='{self.auth_id}'")
-                for row in cursor.fetchall():
-                    urls_to_channels.append(row[0])
-
-        except Exception as _ex:
-            print("[ERROR] Error while working with PostgreSQL", _ex)
-
-        finally:
-            if connection:
-                connection.commit()
-                connection.close()
-                print("[INFO] PostgreSQL connection closed")
-
+        """Получение списка каналов у пользователя под auth_id."""
+        urls_to_channels = self.channels_handler.get_channel_list_by_id(self.AUTH_ID)
+        self.channels_handler.close()
         return urls_to_channels
 
     def get_channels_ids(self, urls_to_channels):
@@ -87,15 +71,11 @@ class YouTubeChannelsParser():
         base_video_url = "https://www.youtube.com/watch?v="
         base_search_url = "https://www.googleapis.com/youtube/v3/search?"
 
-        url = base_search_url + f"key={self.API_KEY}&channelId={channel_id}&part=snippet,id&order=date&maxResults=5"
+        video_num_from_channel = self.configs['User_settings']['video_num_from_channel'] 
+        url = base_search_url + f"key={self.API_KEY}&channelId={channel_id}&part=snippet,id&order=date&maxResults={video_num_from_channel}"
         video_links_and_info = []
-        #Проверка на валедабельность ключа.
-        try:
-            inp = urllib.request.urlopen(url)
-        except:
-            return []
+        inp = urllib.request.urlopen(url)
 
-        print(inp)
         resp = json.load(inp)
         for i in resp['items']:
             if i['id']['kind'] == "youtube#video":
