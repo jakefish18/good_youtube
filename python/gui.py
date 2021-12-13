@@ -1,60 +1,58 @@
 from functools import cached_property
-from re import S
 import sys
 import threading
 
 import keyring
 import configparser
 
-import pafy
-import vlc
+from pytube import YouTube
 
 from PyQt5.QtCore import pyqtSignal, QEvent, QObject, QRect
-from PyQt5.QtWidgets import QApplication, QDialog, QInputDialog, QLineEdit, QMainWindow, QMessageBox, QPushButton, QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QGridLayout, QAction
+from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox, QPushButton, QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QGridLayout
 from  PyQt5.QtGui import QPixmap
 
 from youtube_parser import YouTubeChannelsParser
 from table_handlers import UsersHandler, ChannelsHandler
 from application_windows import WindowToRegister, WindowToAuth, WinAddChannel, WinDelChannel, WinSettings
+from video_player import VideoPlayer
 
+# class PlayerManager(QObject):
+#     def __init__(self, parent=None):
+#         super().__init__(parent)
+#         self.window = QWidget()
+#         if sys.platform.startswith("linux"):  # for Linux using the X Server
+#             self.player.set_xwindow(self.window.winId())
+#         elif sys.platform == "win32":  # for Windows
+#             self.player.set_hwnd(self.window.winId())
+#         elif sys.platform == "darwin":  # for MacOS
+#             self.player.set_nsobject(self.window.winId())
+#         self.window.installEventFilter(self)
 
-class PlayerManager(QObject):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.window = QWidget()
-        if sys.platform.startswith("linux"):  # for Linux using the X Server
-            self.player.set_xwindow(self.window.winId())
-        elif sys.platform == "win32":  # for Windows
-            self.player.set_hwnd(self.window.winId())
-        elif sys.platform == "darwin":  # for MacOS
-            self.player.set_nsobject(self.window.winId())
-        self.window.installEventFilter(self)
+#     @cached_property
+#     def player(self):
+#         player = vlc.MediaPlayer()
+#         player.event_manager().event_attach(
+#             vlc.EventType.MediaPlayerEndReached, self._handle_finished
+#         )
+#         return player
 
-    @cached_property
-    def player(self):
-        player = vlc.MediaPlayer()
-        player.event_manager().event_attach(
-            vlc.EventType.MediaPlayerEndReached, self._handle_finished
-        )
-        return player
+#     def _handle_finished(self, event):
+#         if event.type == vlc.EventType.MediaPlayerEndReached:
+#             self.player.stop()
 
-    def _handle_finished(self, event):
-        if event.type == vlc.EventType.MediaPlayerEndReached:
-            self.player.stop()
+#     def play(self):
+#         self.player.play()
+#         self.window.show()
 
-    def play(self):
-        self.player.play()
-        self.window.show()
+#     def set_media(self, url):
+#         media = vlc.Media(url)
+#         self.player.set_media(media)
 
-    def set_media(self, url):
-        media = vlc.Media(url)
-        self.player.set_media(media)
+#     def eventFilter(self, obj, event):
+#         if obj is self.window and event.type() == QEvent.Close:
+#             self.player.stop()
 
-    def eventFilter(self, obj, event):
-        if obj is self.window and event.type() == QEvent.Close:
-            self.player.stop()
-
-        return super().eventFilter(obj, event)
+#         return super().eventFilter(obj, event)
 
 
 class UrlProvider(QObject):
@@ -64,14 +62,15 @@ class UrlProvider(QObject):
         threading.Thread(target=self._find_url, args=(url,), daemon=True).start()
 
     def _find_url(self, url):
-        video = pafy.new(url)
-        best = video.getbest()
-        self.finished.emit(best.url)
+        video_url = YouTube(url).streams.get_by_itag(22).url
+        print(video_url)
+        self.finished.emit(video_url)
 
 
 class GoodYoutubeGUI(QDialog):
     def __init__(self):
         super().__init__()
+        self.setStyleSheet(open("style.css").read())
         self.setWindowTitle("Good Youtube")
         self.buttons = []
         youtube_parser = YouTubeChannelsParser()
@@ -81,8 +80,8 @@ class GoodYoutubeGUI(QDialog):
         self.url_provider.finished.connect(self.handle_url_finished)
         self.generate_content()
 
-    def player_manager(self):
-        return PlayerManager()
+    # def player_manager(self):
+    #     return PlayerManager()
 
     @cached_property
     def url_provider(self):
@@ -92,6 +91,7 @@ class GoodYoutubeGUI(QDialog):
         buttons_info = {}
         for link in self.video_links_and_info:
             button = QPushButton("Открыть видео", self)
+            button.setFixedSize(150, 30)
             buttons_info[button] = link
 
         return buttons_info
@@ -122,9 +122,9 @@ class GoodYoutubeGUI(QDialog):
         self.url_provider.find_url(url)
 
     def handle_url_finished(self, url):
-        self.player_manager = PlayerManager()
-        self.player_manager.set_media(url)
-        self.player_manager.play()
+        self.video_player = VideoPlayer(url)
+        # self.player_manager.set_media(url)
+        # self.player_manager.play()
 
     def get_date_in_words(self, date):
         """Получение из такого 2021-08-27 такое 27 августа 2021 года."""
@@ -153,19 +153,7 @@ class MainMenu(QWidget):
     def __init__(self):
         super().__init__()
         self.setFixedSize(600, 600)
-        self.setStyleSheet("background: #ffffff; font-size: 17px; font-family: \"sans-serif\"")
-        self.setStyleSheet(
-            """
-                QPushButton{
-                    border: 3px solid #218294;
-                    font-size: 30px;
-                    color: #218294;
-                    font-family: Arial, sans-serif;
-                    width: 250px;
-                    height: 60px;
-                }
-            """
-        )
+        self.setStyleSheet(open("style.css").read())
         #Кнопка регистрации.
         self.btn_register = QPushButton("Регистрация", self)
         self.btn_register.setFixedSize(150, 30)
@@ -174,8 +162,7 @@ class MainMenu(QWidget):
         self.btn_register.move(449, 1)
         #Кнопка входа.
         self.btn_autorize = QPushButton("Войти", self)
-        # self.btn_autorize.setFixedSize(150, 30)
-        # self.btn_autorize.setStyleSheet("border-radius: 3px; background: orange; color: white;")
+        self.btn_autorize.setFixedSize(150, 30)
         self.btn_autorize.clicked.connect(self.open_auth_win)
         self.btn_autorize.move(294, 1)
         #Кнопка запуска.
@@ -214,7 +201,9 @@ class MainMenu(QWidget):
     
     def open_main_content(self):
         """Получение ключа и инициализация контента"""
-        auth_api_key = keyring.get_password('good_tube', 'username')
+        configs.read('config.ini')
+        user_id = configs['User_info']['id']
+        auth_api_key = keyring.get_password('good_tube', user_id)
         if auth_api_key:
             self.destroy()
             self.win_goodtube = ScrollWidget(auth_api_key)
@@ -225,8 +214,8 @@ class MainMenu(QWidget):
     def open_settings_win(self):
         """Открытие окна с настройками."""
         configs.read('config.ini')
-        login = configs['User_info']['login']
-        auth_api_key = keyring.get_password('good_tube', login)
+        user_id = configs['User_info']['id']
+        auth_api_key = keyring.get_password('good_tube', user_id)
         if auth_api_key == 0:
             message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
         
@@ -237,8 +226,7 @@ class MainMenu(QWidget):
         """Добавление в таблицу со столбцами каналов новый канал."""
         configs.read('config.ini')
         auth_id = configs['User_info']['id']
-        login = configs['User_info']['login']
-        auth_api_key = keyring.get_password('good_tube', login)
+        auth_api_key = keyring.get_password('good_tube', auth_id)
         if auth_api_key == 0:
             message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
         
@@ -248,8 +236,8 @@ class MainMenu(QWidget):
     def open_channel_deleting_win(self):
         """Окно для удаления из таблицы со столбцами каналов введенный канал."""
         configs.read('config.ini')
-        login = configs['User_info']['login']
-        auth_api_key = keyring.get_password('good_tube', login)
+        id = configs['User_info']['id']
+        auth_api_key = keyring.get_password('good_tube', id)
         if auth_api_key == 0:
             message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
         
@@ -263,6 +251,7 @@ class ScrollWidget(QWidget):
         self.initUi(api_key)
 
     def initUi(self, api_key):
+        self.setStyleSheet(open("style.css").read())
         self.layoutV = QVBoxLayout(self)
 
         self.area = QScrollArea(self)

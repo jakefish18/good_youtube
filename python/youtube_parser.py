@@ -17,9 +17,8 @@ class YouTubeChannelsParser():
         """Инициализация пути к файлу с url, ключа для доступа в юутб, класс для выкачки данных."""
         self.configs = configparser.ConfigParser()
         self.configs.read('config.ini')
-        login = self.configs['User_info']['login']
         self.AUTH_ID = self.configs['User_info']['id']
-        self.API_KEY = keyring.get_password('good_tube', login)
+        self.API_KEY = keyring.get_password('good_tube', self.AUTH_ID)
         self.channels_handler = ChannelsHandler()
 
 

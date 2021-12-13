@@ -15,12 +15,13 @@ class WindowToRegister(QDialog):
     """Диалоговое окно для ввода ключа апи."""
     def __init__(self):
         super().__init__()
+        self.setStyleSheet(open("style.css").read())
         self.setWindowTitle("Registration")
-        self.setFixedSize(400, 200)
+        self.setFixedSize(500, 200)
         self.api_key = 0
         #Подчказка для ввода текста.
         self.prompt = QLabel(self)
-        self.prompt.setText("Введите ключ апи, логин и пароль, чтобы смортеть видео:")
+        self.prompt.setText("Введите ключ апи, логин и пароль, чтобы смотреть видео:")
         self.prompt.move(10, 10)
         #Поле для ввода логина.
         self.led_login = QLineEdit(self)
@@ -38,6 +39,7 @@ class WindowToRegister(QDialog):
         self.led_api_key.move(10, 90)
         #Кнопка для сохранения ключа.
         self.btn_to_set_api = QPushButton("Зарегистрироваться", self)
+        self.btn_to_set_api.setFixedSize(180, 30)
         self.btn_to_set_api.clicked.connect(self.set_user)
         self.btn_to_set_api.move(10, 120)
         #Ссылка с гайдом для получения ключа.
@@ -55,38 +57,41 @@ class WindowToRegister(QDialog):
 
         #Проверка ключа апи на валидабелность на тестовом запросе..
         try:
-            url = f"https://www.googleapis.com/youtube/v3/search?key={self.API_KEY}&channelId=UCMcC_43zGHttf9bY-xJOTwA&part=snippet,id&order=date&maxResults=5"
+            url = f"https://www.googleapis.com/youtube/v3/search?key={api_key}&channelId=UCMcC_43zGHttf9bY-xJOTwA&part=snippet,id&order=date&maxResults=5"
             test = urllib.request.urlopen(url)
         
         except:
             message = QMessageBox.warning(self, 'Ошибка!', 'Не правильный ключ апи!')
+            return 1
 
         result = users_handler.insert_new_user(login, password, api_key)
 
         if result:
-            keyring.set_password('good_tube', login, api_key) #Добавление пароля в пароли системы.
             id = users_handler.get_user_id_by_login(login)
+            keyring.set_password('good_tube', str(id), api_key) #Добавление пароля в пароли системы.
 
             configs.add_section('User_info')
             configs.set('User_info', 'id', str(id))
-            configs.set('User_info', 'id', login)
+            configs.set('User_info', 'login', login)
             configs.add_section('User_settings')
-            configs.set('User_settings', 'videos_from_channel', '5')
+            configs.set('User_settings', 'video_num_from_channel', '5')
 
             with open('config.ini', 'w') as file:
                 configs.write(file)
             
             message = QMessageBox.information(self, 'Успешно!', 'Регистрация прошла успешно!')
+            return 2
 
         else:
             message = QMessageBox.warning(self, 'Ошибка!', 'Данный логин уже существует!')
-
+            return 3
 
 
 class WindowToAuth(QDialog):
     """Окна входа в аккаунт."""
     def __init__(self):
         super().__init__()
+        self.setStyleSheet(open("style.css").read())
         self.setWindowTitle("Log in")
         self.setFixedSize(400, 130)
         self.api_key = 0
@@ -105,6 +110,7 @@ class WindowToAuth(QDialog):
         self.led_password.move(10, 60)
         #Кнопка для входа.
         self.btn_to_auth = QPushButton("Войти", self)
+        self.btn_to_auth.setFixedSize(150, 30)
         self.btn_to_auth.clicked.connect(self.auth)
         self.btn_to_auth.move(10, 90)
         self.show()
@@ -117,7 +123,7 @@ class WindowToAuth(QDialog):
         auth_info = users_handler.auth_user(login, password)
         if auth_info:
             auth_id, auth_api_key = auth_info
-            keyring.set_password('good_tube', login, auth_api_key)
+            keyring.set_password('good_tube', auth_id, auth_api_key)
 
             configs.add_section('User_info')
             configs.set('User_info', 'id', str(auth_id))
@@ -129,42 +135,89 @@ class WindowToAuth(QDialog):
                 configs.write(file)
             
             message = QMessageBox.information(self, 'Успешно!', 'Вы успешно вошли в аккаунт!')
+            return 0
 
         else:
             message = QMessageBox.warning(self, 'Ошибка!', 'Неправильный логин или пароль!')
-
+            return 1
 
 class WinSettings(QDialog):
     """Окно с настройками."""
     def __init__(self):
         super().__init__()
+        self.setStyleSheet(open("style.css").read())
         self.setWindowTitle("Settings")
-        self.setFixedSize(600, 600)
+        self.setFixedSize(400, 200)
         self.lbl_video_settings = QLabel(self)
         self.lbl_video_settings.setText("Настройки видео")
+        self.lbl_video_settings.move(10, 10)
         #Поле для ввода настройки видео с одного с канала.
         self.led_video_num_from_channel = QLineEdit(self)
         self.led_video_num_from_channel.setFixedSize(300, 20)
         self.led_video_num_from_channel.setPlaceholderText('Количество видео с одного канала...')
-        self.led_video_num_from_channel.move(10, 20)
+        self.led_video_num_from_channel.move(10, 40)
+        #Новый раздел.
+        self.lbl_profile_settings = QLabel(self)
+        self.lbl_profile_settings.setText("Настройки профиля")
+        self.lbl_profile_settings.move(10, 70)
+        #Поле для ввода логина.
+        self.led_login = QLineEdit(self)
+        self.led_login.setFixedSize(300, 20)
+        self.led_login.setPlaceholderText('Ваш логин...')
+        self.led_login.move(10, 100)
+        #Поле для ввода ключа.
+        self.led_api_key = QLineEdit(self)
+        self.led_api_key.setFixedSize(300, 20)
+        self.led_api_key.setPlaceholderText('Ключ апи...')
+        self.led_api_key.move(10, 130)
         #Кнопка для обновления данных.
         self.btn_update_settings = QPushButton("Обновить настройки", self)
+        self.btn_update_settings.setFixedSize(180, 30)
         self.btn_update_settings.clicked.connect(self.update_settings)
-        self.btn_update_settings.move(10, 110)
+        self.btn_update_settings.move(10, 160)
         self.show()
 
     def update_settings(self):
         """Обновление настроек пользователя."""
         video_num_from_channel = self.led_video_num_from_channel.text()
+        login = self.led_login.text()
+        api_key = self.led_api_key.text()
 
+        #Проверка введенного значения количества видео с канала на число.
         if video_num_from_channel.isdigit():
             configs.read('config.ini')
             configs['User_settings']['video_num_from_channel'] = video_num_from_channel
 
         else:
-            message = QMessageBox.warning(self, 'Ошибка!', 'Неправильное значение!')
+            message = QMessageBox.warning(self, 'Ошибка!', 'Неправильное значение числа  видео из канала!')
             return 1
 
+        #Проверка на наличие такого же логина.
+        if users_handler._is_login(login):
+            user_id = configs['User_info']['id']
+            users_handler.update_user_login(login, id)
+            configs['User_info']['login'] = login
+
+        else:
+            message = QMessageBox.warning(self, 'Ошибка!', 'Неправильное значение логина!')
+            return 2
+
+        #Проверка ключа на валидабельность.
+        try: 
+            url = f"https://www.googleapis.com/youtube/v3/search?key={api_key}&channelId=UCMcC_43zGHttf9bY-xJOTwA&part=snippet,id&order=date&maxResults=5"
+            test = urllib.request.urlopen(url)
+            #Если все работает, то продолжаем.
+            configs.read('config.ini')
+
+            user_id = configs['User_info']['id']
+            users_handler.update_user_api_key(user_id, api_key)
+ 
+            keyring.set_password('good_tube', user_id, api_key)
+
+        except:
+            message = QMessageBox.warning(self, 'Ошибка!', 'Неправильное значение ключа апи!')
+            return 3
+        
         with open("config.ini", 'w') as file:
             configs.write(file)
 
@@ -176,8 +229,9 @@ class WinAddChannel(QDialog):
     def __init__(self):
         """Инициализация окна."""
         super().__init__()
+        self.setStyleSheet(open("style.css").read())
         self.setWindowTitle("Add channel")
-        self.setFixedSize(460, 160)
+        self.setFixedSize(490, 160)
         self.prompt = QLabel(self)
         self.prompt.setText('Введите ссылку канала, видео которого\n вы хотите смотреть. Пример:\nhttps://www.youtube.com/channel/UCMcC_43zGHttf9bY-xJOTwA')
         self.prompt.move(10, 10)
@@ -185,6 +239,7 @@ class WinAddChannel(QDialog):
         self.led_channel_url.setFixedWidth(445)
         self.led_channel_url.move(10, 75)
         self.btn_add_channel = QPushButton("Добавить канал", self)
+        self.btn_add_channel.setFixedSize(150, 30)
         self.btn_add_channel.clicked.connect(self.add_channel)
         self.btn_add_channel.move(10, 110)
         self.show()
@@ -193,9 +248,8 @@ class WinAddChannel(QDialog):
         """Добавления данных в таблицу."""
         channel_url = self.led_channel_url.text()
         configs.read('config.ini')
-        login = configs['User_info']['login']
         user_id = configs['User_info']['id']
-        api_key = keyring.get_password('good_tube', login)
+        api_key = keyring.get_password('good_tube', user_id)
         #Проверка на правильность channel_id при помощи тестового запроса.
         try:
             channel_id = channel_url.split('/')[-1] #Получение id в ссылке.
@@ -215,8 +269,9 @@ class WinDelChannel(QDialog):
     """Класс окна для удаления канала пользователя из таблицы."""
     def __init__(self):
         super().__init__()
+        self.setStyleSheet(open("style.css").read())
         self.setWindowTitle("Del channel")
-        self.setFixedSize(600, 600)
+        self.setFixedSize(490, 160)
         self.prompt = QLabel(self)
         self.prompt.setText("Введите ссылку канала, \nкоторую вы добавляли, чтобы удалить её. Пример:\nhttps://www.youtube.com/channel/UCMcC_43zGHttf9bY-xJOTwA")
         self.prompt.move(10, 10)
@@ -224,6 +279,7 @@ class WinDelChannel(QDialog):
         self.led_channel_url.setFixedWidth(445)
         self.led_channel_url.move(10, 75)
         self.btn_del_channel = QPushButton("Удалить канал", self)
+        self.btn_del_channel.setFixedSize(150, 30)
         self.btn_del_channel.clicked.connect(self.del_channel)
         self.btn_del_channel.move(10, 110)
         self.show()

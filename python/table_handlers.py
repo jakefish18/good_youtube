@@ -47,9 +47,17 @@ class UsersHandler(TableHandler):
         
         return result
     
+    def update_user_login(self, id, new_login):
+        """Изменение значения логина пользователя."""
+        self.table_update_execute(f"UPDATE users SET login='{new_login}' where id='{id}'")
+    
+    def update_user_api_key(self, id, new_api_key):
+        """Изменение значения ключа апи пользователя."""
+        self.table_update_execute(f"UPDATE users SET api_key='{new_api_key}' where id='{id}'")
+
     def insert_new_user(self, login, password, api_key):
         """Добавление нового пользователя в таблицу."""
-        if self._is_login(login):
+        if not self._is_login(login):
             self.table_update_execute(f"INSERT INTO users (login, password, api_key) VALUES('{login}', '{password}', '{api_key}')")
             return True
         else:
@@ -77,6 +85,7 @@ class UsersHandler(TableHandler):
         result = self.select_execute(f"select * from users where login='{login}'")[0]
 
         if result:
+            print(type(result[0]))
             return result[0]
         
         else:
