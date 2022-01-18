@@ -10,7 +10,7 @@ class Client():
             socket.SOCK_STREAM
         )
 
-        self.client.connect(('92.255.108.65', 1234))
+        self.client.connect(('92.255.108.65', 12345))
     
     def send_request(self, message: str) -> None:
         self.client.sendall(message.encode('utf-8'))
@@ -20,3 +20,10 @@ class Client():
         data = data.decode('utf-8')
 
         return data
+
+    def generate_request(self, request_type: str, request_task: str, request_parametrs: tuple) -> str:
+        """Создание запроса по переданным параметрам."""
+        request_parametrs = '/'.join(request_parametrs)
+        request = f"{request_type} {request_task} {request_parametrs}"
+
+        return request

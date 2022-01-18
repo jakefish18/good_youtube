@@ -4,7 +4,6 @@ import keyring
 import configparser
 
 from PyQt5.QtWidgets import QDialog, QLineEdit, QMessageBox, QPushButton, QLabel
-from keyring.core import get_password
 
 # from python.server_files.table_handlers import UsersHandler, ChannelsHandler
 from client import Client
@@ -67,12 +66,12 @@ class WindowToRegister(QDialog):
             message = QMessageBox.warning(self, 'Ошибка!', 'Не правильный ключ апи!')
             return 1
 
-        request = f'push insert_new_user {login}_{password}_{api_key}'
+        request = client.generate_request('push', 'insert_new_user', (login, password, api_key))
         client.send_request(request)
         response = int(client.get_response())
 
         if response:
-            request = f'get user_id_by_login {login}'
+            request = client.generate_request('get', 'user_id_by_login', (login, ))
             client.send_request(request)
             response = client.get_response()
 
@@ -131,19 +130,21 @@ class WindowToAuth(QDialog):
         password = self.led_password.text()  
 
         request = f'get auth_user {login}_{password}'
+        request = client.generate_request('get', 'auth_user', (login, password))
         client.send_request(request)
         auth_info = eval(client.get_response())
         
         if auth_info:
             auth_id, auth_api_key = auth_info
-            
+            auth_id = str(auth_id)
+
             keyring.set_password('good_tube', auth_id, password)
 
             configs.add_section('User_info')
             configs.set('User_info', 'id', str(auth_id))
             configs.set('User_info', 'login', login)
             configs.add_section('User_settings')
-            configs.set('User_settings', 'videos_from_channel', '5')
+            configs.set('User_settings', 'video_num_from_channel', '5')
 
             with open('config.ini', 'w') as file:
                 configs.write(file)
@@ -206,17 +207,15 @@ class WinSettings(QDialog):
             message = QMessageBox.warning(self, 'Ошибка!', 'Неправильное значение числа  видео из канала!')
             return 1
 
-        #Проверка на наличие такого же логина.
-        request = f'update is_login login'
-        client.send_request(request)
-        response = int(client.get_response())
+        if login:
+            request = client.generate_request('get', 'is_login', (login, ))
+            client.send_request(request)
+            response = int(client.get_response())
 
-        if response:
             user_id = configs['User_info']['id']
             password = keyring.get_password('good_tube', user_id)
 
-            request = f'update user_login {user_id}_{login}_{password}'
-            # users_handler.update_user_login(login, user_id)
+            request = client.generate_request('update', 'user_login', (user_id, login, password))
             client.send_request(request)
             response = client.get_response()
 
@@ -226,38 +225,38 @@ class WinSettings(QDialog):
             else:
                 meessage = QMessageBox.warning(self, 'Ошибка!', 'Что-то пошло не так!')
                 return 4
-        else:
-            message = QMessageBox.warning(self, 'Ошибка!', 'Неправильное значение логина!')
-            return 2
 
         #Проверка ключа на валидабельность.
-        try: 
-            url = f"https://www.googleapis.com/youtube/v3/search?key={api_key}&channelId=UCMcC_43zGHttf9bY-xJOTwA&part=snippet,id&order=date&maxResults=5"
-            test = urllib.request.urlopen(url)
-            #Если все работает, то продолжаем.
-            configs.read('config.ini')
-
-            user_id = configs['User_info']['id']
-            login = configs['User_info']['login']
+        if api_key:
             
-            password = keyring.get_password('good_tube', user_id)
+            try: 
+                url = f"https://www.googleapis.com/youtube/v3/search?key={api_key}&channelId=UCMcC_43zGHttf9bY-xJOTwA&part=snippet,id&order=date&maxResults=5"
+                test = urllib.request.urlopen(url)
+                #Если все работает, то продолжаем.
+                configs.read('config.ini')
 
-            request = f'update user_api_key {user_id}_{login}_{password}_{api_key}'
-            client.send_request(request)
-            response = client.get_response()
-            
-            if response != '1':
-                QMessageBox.warning(self, 'Ошибка!', 'Что-то пошло не так!')
-            # users_handler.update_user_api_key(user_id, api_key)
+                user_id = configs['User_info']['id']
+                login = configs['User_info']['login']
+                
+                password = keyring.get_password('good_tube', user_id)
 
-        except:
-            message = QMessageBox.warning(self, 'Ошибка!', 'Неправильное значение ключа апи!')
-            return 3
+                request = client.generate_request('update', 'user_api_key', (user_id, login, password, api_key))
+                client.send_request(request)
+                response = client.get_response()
+                
+                if response != '1':
+                    QMessageBox.warning(self, 'Ошибка!', 'Что-то пошло не так!')
+                    return 5
+                # users_handler.update_user_api_key(user_id, api_key)
+
+            except:
+                message = QMessageBox.warning(self, 'Ошибка!', 'Неправильное значение ключа апи!')
+                return 3
         
         with open("config.ini", 'w') as file:
             configs.write(file)
 
-        message = QMessageBox.information(self, 'Успешно!', 'Настройки обновленыы!')
+        message = QMessageBox.information(self, 'Успешно!', 'Настройки обновлены!')
     
 
 class WinAddChannel(QDialog):
@@ -325,7 +324,7 @@ class WinDelChannel(QDialog):
         return NotImplementedError()
         # """Удаление канала, который лежит в self.led_channel_url."""
         # configs.read('config.ini')
-        # id = configs['User_info']['id']
+        # user_id = configs['User_info']['id']
         # channel_url = self.led_channel_url.text()
 
         # #Вывод сообщения по результату действия.

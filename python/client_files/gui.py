@@ -7,52 +7,13 @@ import configparser
 
 from pytube import YouTube
 
-from PyQt5.QtCore import pyqtSignal, QEvent, QObject, QRect
+from PyQt5.QtCore import pyqtSignal, QObject, QRect
 from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox, QPushButton, QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QGridLayout
-from  PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap
 
 from youtube_parser import YouTubeChannelsParser
-from table_handlers import UsersHandler, ChannelsHandler
 from application_windows import WindowToRegister, WindowToAuth, WinAddChannel, WinDelChannel, WinSettings
 from video_player import VideoPlayer
-
-# class PlayerManager(QObject):
-#     def __init__(self, parent=None):
-#         super().__init__(parent)
-#         self.window = QWidget()
-#         if sys.platform.startswith("linux"):  # for Linux using the X Server
-#             self.player.set_xwindow(self.window.winId())
-#         elif sys.platform == "win32":  # for Windows
-#             self.player.set_hwnd(self.window.winId())
-#         elif sys.platform == "darwin":  # for MacOS
-#             self.player.set_nsobject(self.window.winId())
-#         self.window.installEventFilter(self)
-
-#     @cached_property
-#     def player(self):
-#         player = vlc.MediaPlayer()
-#         player.event_manager().event_attach(
-#             vlc.EventType.MediaPlayerEndReached, self._handle_finished
-#         )
-#         return player
-
-#     def _handle_finished(self, event):
-#         if event.type == vlc.EventType.MediaPlayerEndReached:
-#             self.player.stop()
-
-#     def play(self):
-#         self.player.play()
-#         self.window.show()
-
-#     def set_media(self, url):
-#         media = vlc.Media(url)
-#         self.player.set_media(media)
-
-#     def eventFilter(self, obj, event):
-#         if obj is self.window and event.type() == QEvent.Close:
-#             self.player.stop()
-
-#         return super().eventFilter(obj, event)
 
 
 class UrlProvider(QObject):
@@ -63,7 +24,6 @@ class UrlProvider(QObject):
 
     def _find_url(self, url):
         video_url = YouTube(url).streams.get_by_itag(22).url
-        print(video_url)
         self.finished.emit(video_url)
 
 
@@ -73,15 +33,13 @@ class GoodYoutubeGUI(QDialog):
         self.setStyleSheet(open("style.css").read())
         self.setWindowTitle("Good Youtube")
         self.buttons = []
+        print('READY')
         youtube_parser = YouTubeChannelsParser()
         self.video_links_and_info = youtube_parser.parse()
         self.setFixedHeight(len(self.video_links_and_info) * (180 + 20))
         youtube_parser.get_videos_prewiew(self.video_links_and_info)
         self.url_provider.finished.connect(self.handle_url_finished)
         self.generate_content()
-
-    # def player_manager(self):
-    #     return PlayerManager()
 
     @cached_property
     def url_provider(self):
@@ -123,8 +81,6 @@ class GoodYoutubeGUI(QDialog):
 
     def handle_url_finished(self, url):
         self.video_player = VideoPlayer(url)
-        # self.player_manager.set_media(url)
-        # self.player_manager.play()
 
     def get_date_in_words(self, date):
         """Получение из такого 2021-08-27 такое 27 августа 2021 года."""
@@ -181,6 +137,7 @@ class MainMenu(QWidget):
         self.btn_add_channel = QPushButton("Добавить канал", self)
         self.btn_add_channel.setFixedSize(150, 50)
         # self.btn_add_channel.setStyleSheet("border-radius: 3px; background: orange; color: white;")
+    
         self.btn_add_channel.clicked.connect(self.open_channel_adding_win)
         self.btn_add_channel.move(225, 360)
         #Кнопка удаления канала.
@@ -189,7 +146,6 @@ class MainMenu(QWidget):
         # self.btn_del_channel.setStyleSheet("border-radius: 3px; background: orange; color: white;")
         self.btn_del_channel.clicked.connect(self.open_channel_deleting_win)
         self.btn_del_channel.move(225, 415)
-
 
     def open_registration_win(self):
         """Открытия окна для регистрации."""
@@ -203,24 +159,27 @@ class MainMenu(QWidget):
         """Получение ключа и инициализация контента"""
         configs.read('config.ini')
         user_id = configs['User_info']['id']
-        auth_api_key = keyring.get_password('good_tube', user_id)
-        if auth_api_key:
+        password = keyring.get_password('good_tube', user_id)
+
+        if password:
             self.destroy()
-            self.win_goodtube = ScrollWidget(auth_api_key)
+            self.win_goodtube = ScrollWidget()
             self.win_goodtube.show()
+
         else:
-            message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
+            message = QMessageBox.warning(self, 'Ошибки!', 'Войдите в аккаунт!')
 
     def open_settings_win(self):
         """Открытие окна с настройками."""
         configs.read('config.ini')
         user_id = configs['User_info']['id']
-        auth_api_key = keyring.get_password('good_tube', user_id)
-        if auth_api_key == 0:
-            message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
-        
-        else:
+        password = keyring.get_password('good_tube', user_id)
+
+        if password:
             self.win = WinSettings()
+
+        else:
+            message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
 
     def open_channel_adding_win(self):
         """Добавление в таблицу со столбцами каналов новый канал."""
@@ -246,11 +205,11 @@ class MainMenu(QWidget):
 
 
 class ScrollWidget(QWidget):      
-    def __init__(self, api_key, parent=None):
+    def __init__(self, parent=None):
         super(ScrollWidget, self).__init__(parent)
-        self.initUi(api_key)
+        self.initUi()
 
-    def initUi(self, api_key):
+    def initUi(self):
         self.setStyleSheet(open("style.css").read())
         self.layoutV = QVBoxLayout(self)
 
@@ -272,8 +231,6 @@ class ScrollWidget(QWidget):
         self.setGeometry(700, 200, 1000, window_height)        
 
 if __name__ == "__main__":
-    users_handler = UsersHandler()
-    channels_handler = ChannelsHandler()
     configs = configparser.ConfigParser()
     app = QApplication(sys.argv)
     window = MainMenu()
