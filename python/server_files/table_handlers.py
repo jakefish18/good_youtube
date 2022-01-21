@@ -1,4 +1,5 @@
 import psycopg2
+import random
 
 class TableHandler():
     """Общий класс в котором есть подключение к базе данных."""
@@ -26,17 +27,15 @@ class TableHandler():
     def close(self):
         """Закрытие соединения с базой данных."""
         self.connection.close()
-    
 
 class UsersHandler(TableHandler):
     """Класс для работы с таблицой users."""
     def __init__(self):
         super().__init__()
 
-    def is_login(self, login):
+    def is_login(self, login: str) -> bool:
         """Проверка на налчие данного логина в таблице users."""
         check = self.select_execute(f"select * from users where login='{login}'")
-
         #Проверка на наличие подходящих результатов.
         if check:
             return True
@@ -44,18 +43,18 @@ class UsersHandler(TableHandler):
         else:
             return False        
     
-    def is_account(self, login, password):
+    def is_account(self, login: str, password: str) -> bool:
         """Проверка пароля пользователя по логину."""
-        check = self.select_execute(f"select * from users where login='{login}'")[0]
+        check = self.select_execute(f"select * from users where login='{login}'")
 
         #Проверка на наличие подходящих результатов.
-        if check and check[2] == password:
+        if check and check[0][2] == password:
             return True
         
         else:
             return False
 
-    def update_user_login(self, id, new_login):
+    def update_user_login(self, id: str, new_login: str):
         """Изменение значения логина пользователя."""
         self.table_update_execute(f"UPDATE users SET login='{new_login}' where id='{id}'")
     
@@ -71,7 +70,7 @@ class UsersHandler(TableHandler):
         else:
             return False
         
-    def auth_user(self, login, password):
+    def auth_user(self, login: str, password: str) -> bool:
         """Авторизация, проверка на наличие такого логина и пароля."""
         #Проверка на наличие логина.
         if self.is_login(login):
@@ -80,36 +79,26 @@ class UsersHandler(TableHandler):
 
             #Проверка на наличие пароля.
             if user_info[2] == password:
-                #Флаги входа.
-                auth_id = user_info[0]
-                auth_api_key = user_info[3]
-                return (auth_id, auth_api_key)
+                return True
 
             else:
-                return ()
-        else:
-            return ()
+                return False
 
-    def get_user_id_by_login(self, login):
+        else:
+            return False
+
+    def get_user_id_by_login(self, login: str) -> str:
         """Получение id пользователя по его логину."""
         result = self.select_execute(f"select * from users where login='{login}'")[0]
 
-        if result:
-            return result[0]
-        
-        else:
-            return False
+        return result[0]
     
-    def get_user_api_key(self, user_id):
+    
+    def get_user_api_key(self, user_id: str) -> str:
         """Получение ключа апи пользователя по его id."""
         result = self.select_execute(f"select * from users where id='{user_id}'")[0]
 
-        if result:
-            return result[3]
-        
-        else:
-            return False
-
+        return result[3]
 
 class ChannelsHandler(TableHandler):
     """Класс для работы с таблицой channels."""
@@ -123,7 +112,7 @@ class ChannelsHandler(TableHandler):
         else:
             return False
 
-    def get_channel_list_by_id(self, id):
+    def get_channel_list(self, id):
         """Получение списка каналов y id."""
         channel_list = self.select_execute(f"select channel_url from channels where id='{id}'")
         channel_list = [url[0] for url in channel_list] # Преобразование из [(url), (url), (url)] в [url, url, url].
@@ -138,10 +127,57 @@ class ChannelsHandler(TableHandler):
         else:
             return False
     
-    def del_channel(self, id, channel_url):
+    def del_channel(self, id: str, channel_url: str) -> bool:
         """Удаление из таблицы channel_url по id."""
         if self._is_channel_url_by_id(id, channel_url):
             self.table_update_execute(f"DELETE from channels where id='{id}' and channel_url='{channel_url}'")
             return True
+
         else:
             return False
+
+class TokensHandler(TableHandler):
+    """Класс для управления токенами пользовтелей."""
+
+    def __init__(self):
+        super().__init__()
+    
+    def add_token(self, user_id: str) -> str:
+        """Добавление токена в базу данных."""
+        token = self._create_token()
+
+        self.table_update_execute(
+            f'INSERT INTO tokens (id, token) VALUES (\'{user_id}\', \'{token}\')'
+        )
+
+        return token
+
+    def is_token(self, token: str) -> bool:
+        """Проверка на наличие переданного токена."""
+        result = self.select_execute(f'select * from tokens where token=\'{token}\'')
+
+        return bool(result) # result будет пустым и возвращать False, если нет токена.
+    
+    def get_user_id(self, token: str) -> str:
+        """Получение id по переданному токену."""
+        user_id = self.select_execute(f'select * from tokens where token=\'{token}\'')[0][0]
+
+        return user_id
+
+    def _create_token(self):
+        """Создание токена пользователя для его заросов."""
+        small_letters = 'qwertyuiopasdfghjklzxcvbnm'
+        big_letters = 'QWERTYUIOPASDFGHJKLZXCVBNM'
+        nums = '1234567890'
+
+        all_chars = small_letters + big_letters + nums
+
+        token = random.sample(all_chars, 25)
+        token = "".join(token)
+        # Генерация нового случайного токена, если такой токен уже существует, пока не создастся не существующий токен. 
+        while self.is_token(token): 
+            token = random.sample(all_chars, 25)
+            token = "".join(token)
+
+        return token
+    

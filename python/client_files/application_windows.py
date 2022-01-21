@@ -1,22 +1,18 @@
-from re import S
-import urllib.request
-import keyring
-import configparser
-
 from PyQt5.QtWidgets import QDialog, QLineEdit, QMessageBox, QPushButton, QLabel
 
-# from python.server_files.table_handlers import UsersHandler, ChannelsHandler
-from client import Client
+from configs_handler import ConfigsHandler
+from client import get_good_tube_api_response
 
-# users_handler = UsersHandler()
-# channels_handler = ChannelsHandler()
-client = Client()
-configs = configparser.ConfigParser()
 
 class WindowToRegister(QDialog):
     """Диалоговое окно для ввода ключа апи."""
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
+        self.configs_handler = ConfigsHandler()
+        self.init_ui()
+
+    def init_ui(self) -> None:
+        """Инициализация интерфейса."""
         self.setStyleSheet(open("style.css").read())
         self.setWindowTitle("Registration")
         self.setFixedSize(500, 200)
@@ -56,50 +52,56 @@ class WindowToRegister(QDialog):
         login = self.led_login.text()
         password = self.led_password.text()
         api_key = self.led_api_key.text()
-
-        #Проверка ключа апи на валидабелность на тестовом запросе..
-        try:
-            url = f"https://www.googleapis.com/youtube/v3/search?key={api_key}&channelId=UCMcC_43zGHttf9bY-xJOTwA&part=snippet,id&order=date&maxResults=5"
-            test = urllib.request.urlopen(url)
         
-        except:
-            message = QMessageBox.warning(self, 'Ошибка!', 'Не правильный ключ апи!')
-            return 1
+        parametrs = {
+            'login': login,
+            'password': password,
+            'api_key': api_key
+        }
 
-        request = client.generate_request('push', 'insert_new_user', (login, password, api_key))
-        client.send_request(request)
-        response = int(client.get_response())
+        response = get_good_tube_api_response('insert_new_user', parametrs)
+        print(response)
 
-        if response:
-            request = client.generate_request('get', 'user_id_by_login', (login, ))
-            client.send_request(request)
-            response = client.get_response()
+        response_code = response['response']
+        if response_code == 200:
+            parametrs = {
+                'login': login,
+                'password': password
+            }
 
-            id = int(response)
+            response = get_good_tube_api_response('generate_token', parametrs)
+            response_code = response['response']
 
-            keyring.set_password('good_tube', str(id), password) #Добавление пароля в пароли системы.
+            if response_code == 200:
+                token = response['token']
 
-            configs.add_section('User_info')
-            configs.set('User_info', 'id', str(id))
-            configs.set('User_info', 'login', login)
-            configs.add_section('User_settings')
-            configs.set('User_settings', 'video_num_from_channel', '5')
+                configs_to_add = [
+                    ['User_info', 'token', token],
+                    ['User_settings', 'video_num_from_channel', '5']
+                ]
+                
+                self.configs_handler.push_data(configs_to_add)
 
-            with open('config.ini', 'w') as file:
-                configs.write(file)
+                message = QMessageBox.information(self, 'Успешно!', 'Регистрация прошла успешно, можете запускать!')
+
+            else:                
+                message = QMessageBox.warning(self, 'Ошибка!', 'Что-то пошло не так!')
+
+        elif response_code == 402:
+            message = QMessageBox.warning(self, 'Ошибка!', 'Некорректный ключ апи!')
             
-            message = QMessageBox.information(self, 'Успешно!', 'Регистрация прошла успешно!')
-            return 2
-
-        else:
+        elif response_code == 403:
             message = QMessageBox.warning(self, 'Ошибка!', 'Данный логин уже существует!')
-            return 3
 
 
 class WindowToAuth(QDialog):
     """Окна входа в аккаунт."""
     def __init__(self):
         super().__init__()
+        self.init_ui()
+        self.configs_handler = ConfigsHandler()
+
+    def init_ui(self):
         self.setStyleSheet(open("style.css").read())
         self.setWindowTitle("Log in")
         self.setFixedSize(400, 130)
@@ -124,42 +126,42 @@ class WindowToAuth(QDialog):
         self.btn_to_auth.move(10, 90)
         self.show()
 
-    def auth(self):
+    def auth(self) -> None:
         """Авторизация."""
         login = self.led_login.text()
         password = self.led_password.text()  
 
-        request = f'get auth_user {login}_{password}'
-        request = client.generate_request('get', 'auth_user', (login, password))
-        client.send_request(request)
-        auth_info = eval(client.get_response())
-        
-        if auth_info:
-            auth_id, auth_api_key = auth_info
-            auth_id = str(auth_id)
+        parametrs = {
+            'login': login,
+            'password': password
+        }
 
-            keyring.set_password('good_tube', auth_id, password)
+        response = get_good_tube_api_response('generate_token', parametrs)
 
-            configs.add_section('User_info')
-            configs.set('User_info', 'id', str(auth_id))
-            configs.set('User_info', 'login', login)
-            configs.add_section('User_settings')
-            configs.set('User_settings', 'video_num_from_channel', '5')
+        response_code = response['response']
 
-            with open('config.ini', 'w') as file:
-                configs.write(file)
-            
+        if response_code == 200:
+            token = response['token']
+
+            configs_to_add = [
+                ['User_info', 'token', token],
+                ['User_settings', 'video_num_from_channel', '5']
+            ]
+
+            self.configs_handler.push_data(configs_to_add)            
             message = QMessageBox.information(self, 'Успешно!', 'Вы успешно вошли в аккаунт!')
-            return 0
 
         else:
             message = QMessageBox.warning(self, 'Ошибка!', 'Неправильный логин или пароль!')
-            return 1
 
 class WinSettings(QDialog):
     """Окно с настройками."""
     def __init__(self):
         super().__init__()
+        self.init_ui()
+        self.configs_handler = ConfigsHandler()
+
+    def init_ui(self):
         self.setStyleSheet(open("style.css").read())
         self.setWindowTitle("Settings")
         self.setFixedSize(400, 200)
@@ -192,7 +194,7 @@ class WinSettings(QDialog):
         self.btn_update_settings.move(10, 160)
         self.show()
 
-    def update_settings(self):
+    def update_settings(self) -> bool:
         """Обновление настроек пользователя."""
         video_num_from_channel = self.led_video_num_from_channel.text()
         login = self.led_login.text()
@@ -200,61 +202,50 @@ class WinSettings(QDialog):
 
         #Проверка введенного значения количества видео с канала на число.
         if video_num_from_channel.isdigit():
-            configs.read('config.ini')
-            configs['User_settings']['video_num_from_channel'] = video_num_from_channel
+            configs_to_add = [
+                ['User_settings', 'video_num_from_channel', video_num_from_channel]
+            ]
+            
+            self.configs_handler.push_data(configs_to_add)
+
 
         else:
             message = QMessageBox.warning(self, 'Ошибка!', 'Неправильное значение числа  видео из канала!')
-            return 1
+            return False
 
         if login:
-            request = client.generate_request('get', 'is_login', (login, ))
-            client.send_request(request)
-            response = int(client.get_response())
+            token = self.configs_handler.get_token()
 
-            user_id = configs['User_info']['id']
-            password = keyring.get_password('good_tube', user_id)
+            parametrs = {
+                'token': token
+            }
 
-            request = client.generate_request('update', 'user_login', (user_id, login, password))
-            client.send_request(request)
-            response = client.get_response()
+            response = get_good_tube_api_response('update_user_login', parametrs)
+            response_code = response['response']
 
-            if response == '1':
-                configs['User_info']['login'] = login
+            if response_code == 401:
+                meessage = QMessageBox.warning(self, 'Ошибка!', 'Авторизуйтесь!')
+                return False
 
-            else:
-                meessage = QMessageBox.warning(self, 'Ошибка!', 'Что-то пошло не так!')
-                return 4
+            elif response_code == 403:
+                message = QMessageBox.warning(self, 'Ошибка', 'Логин уже существует!')          
+                return False  
 
         #Проверка ключа на валидабельность.
         if api_key:
             
-            try: 
-                url = f"https://www.googleapis.com/youtube/v3/search?key={api_key}&channelId=UCMcC_43zGHttf9bY-xJOTwA&part=snippet,id&order=date&maxResults=5"
-                test = urllib.request.urlopen(url)
-                #Если все работает, то продолжаем.
-                configs.read('config.ini')
+            #Если все работает, то продолжаем.
+            token = self.configs_handler.get_token()
 
-                user_id = configs['User_info']['id']
-                login = configs['User_info']['login']
-                
-                password = keyring.get_password('good_tube', user_id)
+            parametrs = {
+                'token': token
+            }
 
-                request = client.generate_request('update', 'user_api_key', (user_id, login, password, api_key))
-                client.send_request(request)
-                response = client.get_response()
-                
-                if response != '1':
-                    QMessageBox.warning(self, 'Ошибка!', 'Что-то пошло не так!')
-                    return 5
-                # users_handler.update_user_api_key(user_id, api_key)
-
-            except:
+            response = get_good_tube_api_response('update_user_api_key', parametrs)
+            
+            if response == 402:
                 message = QMessageBox.warning(self, 'Ошибка!', 'Неправильное значение ключа апи!')
-                return 3
-        
-        with open("config.ini", 'w') as file:
-            configs.write(file)
+                return False
 
         message = QMessageBox.information(self, 'Успешно!', 'Настройки обновлены!')
     
@@ -262,8 +253,12 @@ class WinSettings(QDialog):
 class WinAddChannel(QDialog):
     """Окно для ввода канала."""
     def __init__(self):
-        """Инициализация окна."""
         super().__init__()
+        self.init_ui()
+        self.config_handler = ConfigsHandler()
+        
+    def init_ui(self):
+        """Инициализация окна."""
         self.setStyleSheet(open("style.css").read())
         self.setWindowTitle("Add channel")
         self.setFixedSize(490, 160)
@@ -281,30 +276,37 @@ class WinAddChannel(QDialog):
     
     def add_channel(self):
         """Добавления данных в таблицу."""
-        raise NotImplementedError()
-        # channel_url = self.led_channel_url.text()
-        # configs.read('config.ini')
-        # user_id = configs['User_info']['id']
-        # # api_key = keyring.get_password('good_tube', user_id)
-        # #Проверка на правильность channel_id при помощи тестового запроса.
-        # try:
-        #     channel_id = channel_url.split('/')[-1] #Получение id в ссылке.
-        #     url = f"https://www.googleapis.com/youtube/v3/search?key={api_key}&channelId={channel_id}&part=snippet,id&order=date&maxResults=5"
-        #     test = urllib.request.urlopen(url)
-        # except:
-        #     message = QMessageBox.warning(self, 'Ошибка!', 'Неправильная ссылка!')
-        #     return 1
-    
-        # # if channels_handler.add_channel(user_id, channel_url):
-        #     # message = QMessageBox.information(self, 'Успешно!', 'Канала добавлен!')
-        # # else:
-        #     # message = QMessageBox.warning(self, 'Ошибка!', 'Вы уже добавили этот канал!')
+        channel_url = self.led_channel_url.text()
+        token = self.config_handler.get_token()
 
+        parametrs = {
+            'channel_url': channel_url,
+            'token': token
+        }
+
+        response = get_good_tube_api_response('add_channel', parametrs)
+        response_code = response['response']
+
+        if response_code == 200:
+            message = QMessageBox.information(self, 'Успешно!', 'Канала добавлен!')
+
+        elif response_code == 401:
+            message = QMessageBox.warning(self, 'Ошибка!', 'Пройдите авторизацию!')
+
+        elif response_code == 404:
+            message = QMessageBox.warning(self, 'Ошибка!', 'Вы уже добавили этот канал!')
+
+        elif response_code == 407:
+            message = QMessageBox.warning(self, 'Ошибка!', 'Неправильная ссылка на канал!')
 
 class WinDelChannel(QDialog):
     """Класс окна для удаления канала пользователя из таблицы."""
     def __init__(self):
         super().__init__()
+        self.init_ui()
+        self.configs_handler = ConfigsHandler()
+
+    def init_ui(self):
         self.setStyleSheet(open("style.css").read())
         self.setWindowTitle("Del channel")
         self.setFixedSize(490, 160)
@@ -321,15 +323,24 @@ class WinDelChannel(QDialog):
         self.show()
     
     def del_channel(self):
-        return NotImplementedError()
-        # """Удаление канала, который лежит в self.led_channel_url."""
-        # configs.read('config.ini')
-        # user_id = configs['User_info']['id']
-        # channel_url = self.led_channel_url.text()
+        """Удаление канала, который лежит в self.led_channel_url."""
+        channel_url = self.led_channel_url.text()
+        token = self.configs_handler.get_token()
 
-        # #Вывод сообщения по результату действия.
-        # if channels_handler.del_channel(id, channel_url):
-        #     message = QMessageBox.information(self, 'Успешно!', 'Канал удален успешно!')
+        parametrs = {
+            'channel_url': channel_url,
+            'token': token
+        }
+
+        response = get_good_tube_api_response('del_channel', parametrs)
+        response_code = response['response']
+
+        #Вывод сообщения по результату действия.
+        if response_code == 200:
+            message = QMessageBox.information(self, 'Успешно!', 'Канал удален успешно!')
         
-        # else:
-        #     message = QMessageBox.warning(self, 'Ошибка!', 'Канала нет в вашем списке!')
+        elif response_code == 401:
+            message = QMessageBox.warning(self, 'Ошибка!', 'Авторизуйтесь!')
+
+        elif response_code == 405:
+            message = QMessageBox.warning(self, 'Ошибка!', 'Канала нет в вашем списке!')

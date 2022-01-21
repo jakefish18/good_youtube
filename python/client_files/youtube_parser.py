@@ -1,40 +1,29 @@
-import configparser
 import json
 import random
-import urllib.request
 import os
 import requests
 import shutil
-import keyring
 
 from html import unescape
 
-from client import Client
-
+from client import get_good_tube_api_response
+from configs_handler import ConfigsHandler
 
 class YouTubeChannelsParser():
     """Класс парсера каналов в файле ютуба."""
     def __init__(self):
         """Инициализация пути к файлу с url, ключа для доступа в юутб, класс для выкачки данных."""
-        self.configs = configparser.ConfigParser()
-        self.configs.read('config.ini')
 
-        self.user_id = self.configs['User_info']['id']
-        self.login = self.configs['User_info']['login']
-        self.password = keyring.get_password('good_tube', self.user_id)
+        self.configs_handler = ConfigsHandler()
+        token = self.configs_handler.get_token()
+        
+        parametrs = {
+            'token': token
+        }
 
-        self.client = Client()
-        print('Ready')
-        self.API_KEY = self._get_user_api_key()
+        response = get_good_tube_api_response('get_user_api_key', parametrs=parametrs)
 
-    def _get_user_api_key(self):
-        """Запрос на сервер для получения ключа для запросов."""
-
-        request = self.client.generate_request('get', 'user_api_key', (self.user_id, self.login, self.password))
-        self.client.send_request(request)
-        response = self.client.get_response()
-
-        return response
+        self.API_KEY = response['api_key']
 
     def parse(self):
         """Основная функция парсера, которая возвращает список видео."""
@@ -67,12 +56,14 @@ class YouTubeChannelsParser():
 
     def get_channels_urls(self):
         """Получение списка каналов у пользователя под auth_id."""
+        token = self.configs_handler.get_token()
+        
+        parametrs = {
+            'token': token
+        }
 
-        request = self.client.generate_request('get', 'channel_list_by_id', (self.user_id, self.login, self.password))
-        self.client.send_request(request)
-        urls_to_channels = self.client.get_response()
-
-        urls_to_channels = eval(urls_to_channels)
+        response = get_good_tube_api_response('channel_list_by_id', parametrs)
+        urls_to_channels = response['channels_list']
 
         return urls_to_channels
 
@@ -91,13 +82,13 @@ class YouTubeChannelsParser():
         base_video_url = "https://www.youtube.com/watch?v="
         base_search_url = "https://www.googleapis.com/youtube/v3/search?"
 
-        video_num_from_channel = self.configs['User_settings']['video_num_from_channel'] 
+        video_num_from_channel = self.configs_handler.get_video_num_from_channel() 
         url = base_search_url + f"key={self.API_KEY}&channelId={channel_id}&part=snippet,id&order=date&maxResults={video_num_from_channel}"
-        print(url)
-        video_links_and_info = []
-        inp = urllib.request.urlopen(url)
 
-        resp = json.load(inp)
+        video_links_and_info = []
+        inp = requests.get(url)
+        resp = json.loads(inp.text)
+
         for i in resp['items']:
             if i['id']['kind'] == "youtube#video":
                 video_links_and_info.append([base_video_url + i['id']['videoId'],
@@ -107,6 +98,3 @@ class YouTubeChannelsParser():
                                     i['snippet']['publishTime']])
 
         return video_links_and_info
-
-
-

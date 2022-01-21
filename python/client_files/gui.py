@@ -2,9 +2,6 @@ from functools import cached_property
 import sys
 import threading
 
-import keyring
-import configparser
-
 from pytube import YouTube
 
 from PyQt5.QtCore import pyqtSignal, QObject, QRect
@@ -14,6 +11,7 @@ from PyQt5.QtGui import QPixmap
 from youtube_parser import YouTubeChannelsParser
 from application_windows import WindowToRegister, WindowToAuth, WinAddChannel, WinDelChannel, WinSettings
 from video_player import VideoPlayer
+from configs_handler import ConfigsHandler
 
 
 class UrlProvider(QObject):
@@ -33,7 +31,6 @@ class GoodYoutubeGUI(QDialog):
         self.setStyleSheet(open("style.css").read())
         self.setWindowTitle("Good Youtube")
         self.buttons = []
-        print('READY')
         youtube_parser = YouTubeChannelsParser()
         self.video_links_and_info = youtube_parser.parse()
         self.setFixedHeight(len(self.video_links_and_info) * (180 + 20))
@@ -41,7 +38,7 @@ class GoodYoutubeGUI(QDialog):
         self.url_provider.finished.connect(self.handle_url_finished)
         self.generate_content()
 
-    @cached_property
+    # @cached_property
     def url_provider(self):
         return UrlProvider()
 
@@ -108,6 +105,10 @@ class MainMenu(QWidget):
     """Меню в котором кнопка для того, чтобы поставить ключ и запуска основного окна."""
     def __init__(self):
         super().__init__()
+        self.init_ui()
+        self.config_handler = ConfigsHandler()
+
+    def init_ui(self):
         self.setFixedSize(600, 600)
         self.setStyleSheet(open("style.css").read())
         #Кнопка регистрации.
@@ -157,11 +158,9 @@ class MainMenu(QWidget):
     
     def open_main_content(self):
         """Получение ключа и инициализация контента"""
-        configs.read('config.ini')
-        user_id = configs['User_info']['id']
-        password = keyring.get_password('good_tube', user_id)
+        token = self.config_handler.get_token()
 
-        if password:
+        if token:
             self.destroy()
             self.win_goodtube = ScrollWidget()
             self.win_goodtube.show()
@@ -171,11 +170,9 @@ class MainMenu(QWidget):
 
     def open_settings_win(self):
         """Открытие окна с настройками."""
-        configs.read('config.ini')
-        user_id = configs['User_info']['id']
-        password = keyring.get_password('good_tube', user_id)
+        token = self.config_handler.get_token()
 
-        if password:
+        if token:
             self.win = WinSettings()
 
         else:
@@ -183,26 +180,23 @@ class MainMenu(QWidget):
 
     def open_channel_adding_win(self):
         """Добавление в таблицу со столбцами каналов новый канал."""
-        configs.read('config.ini')
-        auth_id = configs['User_info']['id']
-        auth_api_key = keyring.get_password('good_tube', auth_id)
-        if auth_api_key == 0:
-            message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
+        token = self.config_handler.get_token()
+
+        if token:
+            self.win = WinAddChannel()
         
         else:
-            self.win = WinAddChannel()
+            message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
     
     def open_channel_deleting_win(self):
         """Окно для удаления из таблицы со столбцами каналов введенный канал."""
-        configs.read('config.ini')
-        id = configs['User_info']['id']
-        auth_api_key = keyring.get_password('good_tube', id)
-        if auth_api_key == 0:
-            message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
-        
-        else:
+        token = self.config_handler.get_token()
+
+        if token:
             self.win = WinDelChannel()
 
+        else:
+            message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
 
 class ScrollWidget(QWidget):      
     def __init__(self, parent=None):
@@ -231,7 +225,6 @@ class ScrollWidget(QWidget):
         self.setGeometry(700, 200, 1000, window_height)        
 
 if __name__ == "__main__":
-    configs = configparser.ConfigParser()
     app = QApplication(sys.argv)
     window = MainMenu()
     window.show()

@@ -122,3 +122,5 @@ class VideoPlayer(QWidget):
             self.media_player.stop()
 
         return super().eventFilter(obj, event)
+
+
