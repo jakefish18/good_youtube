@@ -1,6 +1,3 @@
-from calendar import c
-from cgitb import reset
-from crypt import methods
 import json
 import requests as global_requests
 
@@ -265,6 +262,14 @@ def update_user_api_key():
 
     return response
 
+@app.route('/test/', methods=['GET'])
+def test():
+    response = {'Response': 'Hello, Camilus!'}
+
+    response = json.dumps(response)
+
+    return response
+
 def check_api_key(api_key: str) -> bool:
     """Проверка ключа апи тестовым запросом."""
     request = f"https://www.googleapis.com/youtube/v3/search?key={api_key}&channelId=UCMcC_43zGHttf9bY-xJOTwA&part=snippet,id&order=date&maxResults=1"
@@ -294,4 +299,4 @@ if __name__=='__main__':
     users_handler = UsersHandler()
     channels_handler = ChannelsHandler()
     tokens_handler = TokensHandler()
-    serve(app, host='0.0.0.0', port=1234)
+    serve(app, host='0.0.0.0', port=12345)

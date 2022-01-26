@@ -13,15 +13,16 @@ from application_windows import WindowToRegister, WindowToAuth, WinAddChannel, W
 from video_player import VideoPlayer
 from configs_handler import ConfigsHandler
 
+import faulthandler
+faulthandler.enable()
+
 
 class UrlProvider(QObject):
     finished = pyqtSignal(str)
-
     def find_url(self, url):
         threading.Thread(target=self._find_url, args=(url,), daemon=True).start()
-
-    def _find_url(self, url):
-        video_url = YouTube(url).streams.get_by_itag(22).url
+    def find_url(self, url):
+        video_url = YouTube(url).streams.get_by_itag(85).url
         self.finished.emit(video_url)
 
 
@@ -35,12 +36,12 @@ class GoodYoutubeGUI(QDialog):
         self.video_links_and_info = youtube_parser.parse()
         self.setFixedHeight(len(self.video_links_and_info) * (180 + 20))
         youtube_parser.get_videos_prewiew(self.video_links_and_info)
-        self.url_provider.finished.connect(self.handle_url_finished)
+        # self.url_provider.finished.connect(self.handle_url_finished)
         self.generate_content()
 
     # @cached_property
-    def url_provider(self):
-        return UrlProvider()
+    # def url_provider(self):
+        # return UrlProvider()
 
     def generate_buttons_info(self):
         buttons_info = {}
@@ -69,7 +70,7 @@ class GoodYoutubeGUI(QDialog):
             lbl = QLabel(self)
             lbl.setText(self.get_date_in_words(link[4]))
             lbl.move(320, 40 + 200 * pos_y)
-            button.clicked.connect(lambda checked, link=link[0]: self.open_video(link))
+            button.clicked.connect(lambda checked, link=link[0]: self.handle_url_finished(link))
             button.move(320, 60 + pos_y * 200)
             pos_y += 1
 
@@ -77,7 +78,8 @@ class GoodYoutubeGUI(QDialog):
         self.url_provider.find_url(url)
 
     def handle_url_finished(self, url):
-        self.video_player = VideoPlayer(url)
+        video_url = YouTube(url).streams.get_by_itag(22).url
+        self.video_player = VideoPlayer(video_url)
 
     def get_date_in_words(self, date):
         """Получение из такого 2021-08-27 такое 27 августа 2021 года."""
