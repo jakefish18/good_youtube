@@ -60,7 +60,6 @@ class WindowToRegister(QDialog):
         }
 
         response = get_good_tube_api_response('insert_new_user', parametrs)
-        print(response)
 
         response_code = response['response']
         if response_code == 200:

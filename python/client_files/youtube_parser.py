@@ -84,6 +84,7 @@ class YouTubeChannelsParser():
 
         video_num_from_channel = self.configs_handler.get_video_num_from_channel() 
         url = base_search_url + f"key={self.API_KEY}&channelId={channel_id}&part=snippet,id&order=date&maxResults={video_num_from_channel}"
+        print(url)
 
         video_links_and_info = []
         inp = requests.get(url)

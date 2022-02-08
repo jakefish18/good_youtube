@@ -6,12 +6,12 @@ class TableHandler():
     def __init__(self):
         """Подключение к базе данных."""
         self.connection = psycopg2.connect(
-            host="ec2-54-170-163-224.eu-west-1.compute.amazonaws.com",
-            user="uvdhbagmtheqly",
-            password="898ffb10b3a5fbdf59a98f25e7f03ac3ec8a1933edbdb8fde5b262a936f43ae3",
-            database="d7kkv7tv2pire0" 
+            host="127.0.0.1",
+            user="insaf",
+            password="Insaff2006",
+            database="good_tube"
         )
-    
+
     def select_execute(self, command: str):
         """Возвращение результата select запроса."""
         with self.connection.cursor() as cursor:
@@ -180,4 +180,4 @@ class TokensHandler(TableHandler):
             token = "".join(token)
 
         return token
-    
+

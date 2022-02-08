@@ -1,1 +1,1 @@
-from 
+print(len('https://www.googleapis.com/youtube/v3/search?key=AIzaSyDPRxayW_cIe_8mkhtW-dsknFS46H6opnA&channelId=UCAuUUnT6oDeKwE6v1NGQxug&part=snippet,id&order=date&maxResults=5'))
