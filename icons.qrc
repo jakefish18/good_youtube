@@ -1,0 +1,22 @@
+<RCC>
+  <qresource prefix="icons">
+    <file>icons/стрелка вниз.png</file>
+    <file>icons/поиск.png</file>
+    <file>icons/меню.png</file>
+    <file>icons/минус.png</file>
+    <file>icons/плюс.png</file>
+    <file>icons/настройки.png</file>
+    <file>icons/good_tube_logo.png</file>
+    <file>icons/поиск.png</file>
+    <file>icons/меню.png</file>
+    <file>icons/минус.png</file>
+    <file>icons/плюс.png</file>
+    <file>icons/настройки.png</file>
+    <file>icons/поиск.png</file>
+    <file>icons/меню.png</file>
+    <file>icons/минус.png</file>
+    <file>icons/плюс.png</file>
+    <file>icons/настройки.png</file>
+    <file>icons/поиск.png</file>
+  </qresource>
+</RCC>

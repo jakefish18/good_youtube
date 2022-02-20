@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox, QPushButton, QWi
 from PyQt5.QtGui import QPixmap
 
 from youtube_parser import YouTubeChannelsParser
-from application_windows import WindowToRegister, WindowToAuth, WinAddChannel, WinDelChannel, WinSettings
+from application_windows import WindowToRegister, WindowToAuth, WinAddChannel, WinDelChannel, WinSettings, WinSearchVideo
 from video_player import VideoPlayer
 from configs_handler import ConfigsHandler
 
@@ -29,13 +29,17 @@ class UrlProvider(QObject):
 class GoodYoutubeGUI(QDialog):
     def __init__(self):
         super().__init__()
-        self.setStyleSheet(open("style.css").read())
+        self.configs_handler = ConfigsHandler()
+
+        self.setStyleSheet(open(self.configs_handler.path_to_styles).read())
         self.setWindowTitle("Good Youtube")
+        
         self.buttons = []
         youtube_parser = YouTubeChannelsParser()
         self.video_links_and_info = youtube_parser.parse()
-        self.setFixedHeight(len(self.video_links_and_info) * (180 + 20))
         youtube_parser.get_videos_prewiew(self.video_links_and_info)
+
+        self.setFixedHeight(len(self.video_links_and_info) * (180 + 20))
         # self.url_provider.finished.connect(self.handle_url_finished)
         self.generate_content()
 
@@ -107,12 +111,15 @@ class MainMenu(QWidget):
     """Меню в котором кнопка для того, чтобы поставить ключ и запуска основного окна."""
     def __init__(self):
         super().__init__()
-        self.init_ui()
+
         self.config_handler = ConfigsHandler()
+
+        self.init_ui()
 
     def init_ui(self):
         self.setFixedSize(600, 600)
-        self.setStyleSheet(open("style.css").read())
+        print(self.config_handler.path_to_styles)
+        self.setStyleSheet(open(self.config_handler.path_to_styles).read())
         #Кнопка регистрации.
         self.btn_register = QPushButton("Регистрация", self)
         self.btn_register.setFixedSize(150, 30)
@@ -140,7 +147,6 @@ class MainMenu(QWidget):
         self.btn_add_channel = QPushButton("Добавить канал", self)
         self.btn_add_channel.setFixedSize(150, 50)
         # self.btn_add_channel.setStyleSheet("border-radius: 3px; background: orange; color: white;")
-    
         self.btn_add_channel.clicked.connect(self.open_channel_adding_win)
         self.btn_add_channel.move(225, 360)
         #Кнопка удаления канала.
@@ -149,6 +155,12 @@ class MainMenu(QWidget):
         # self.btn_del_channel.setStyleSheet("border-radius: 3px; background: orange; color: white;")
         self.btn_del_channel.clicked.connect(self.open_channel_deleting_win)
         self.btn_del_channel.move(225, 415)
+        #Кнопка открытия окна поиска.
+        self.btn_search_video = QPushButton("Поиск видео", self)
+        self.btn_search_video.setFixedSize(150, 50)
+        self.btn_search_video.clicked.connect(self.open_search_win)
+        self.btn_search_video.move(225, 470)
+
 
     def open_registration_win(self):
         """Открытия окна для регистрации."""
@@ -160,7 +172,7 @@ class MainMenu(QWidget):
     
     def open_main_content(self):
         """Получение ключа и инициализация контента"""
-        token = self.config_handler.get_token()
+        token = self.config_handler._get_token()
 
         if token:
             self.destroy()
@@ -172,7 +184,7 @@ class MainMenu(QWidget):
 
     def open_settings_win(self):
         """Открытие окна с настройками."""
-        token = self.config_handler.get_token()
+        token = self.config_handler._get_token()
 
         if token:
             self.win = WinSettings()
@@ -182,17 +194,17 @@ class MainMenu(QWidget):
 
     def open_channel_adding_win(self):
         """Добавление в таблицу со столбцами каналов новый канал."""
-        token = self.config_handler.get_token()
+        token = self.config_handler._get_token()
 
         if token:
             self.win = WinAddChannel()
-        
+
         else:
             message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
     
     def open_channel_deleting_win(self):
         """Окно для удаления из таблицы со столбцами каналов введенный канал."""
-        token = self.config_handler.get_token()
+        token = self.config_handler._get_token()
 
         if token:
             self.win = WinDelChannel()
@@ -200,13 +212,24 @@ class MainMenu(QWidget):
         else:
             message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
 
+    def open_search_win(self):
+        """Окно с информацией о найденном видео."""
+        token = self.config_handler._get_token()
+
+        if token:
+            self.win = WinSearchVideo()
+        
+        else:
+            message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
+
 class ScrollWidget(QWidget):      
     def __init__(self, parent=None):
         super(ScrollWidget, self).__init__(parent)
+        self.configs_handler = ConfigsHandler()
         self.initUi()
 
     def initUi(self):
-        self.setStyleSheet(open("style.css").read())
+        self.setStyleSheet(open(self.configs_handler.path_to_styles).read())
         self.layoutV = QVBoxLayout(self)
 
         self.area = QScrollArea(self)

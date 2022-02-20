@@ -1,8 +1,11 @@
-from PyQt5.QtWidgets import QDialog, QLineEdit, QMessageBox, QPushButton, QLabel
+from PyQt5.QtWidgets import QDialog, QLineEdit, QMessageBox, QPushButton, QLabel, QHBoxLayout, QVBoxLayout
+from PyQt5.QtGui import QPixmap
+from pytube import YouTube
 
 from configs_handler import ConfigsHandler
 from client import get_good_tube_api_response
-
+from youtube_parser import YouTubeChannelsParser
+from video_player import VideoPlayer
 
 class WindowToRegister(QDialog):
     """Диалоговое окно для ввода ключа апи."""
@@ -13,7 +16,7 @@ class WindowToRegister(QDialog):
 
     def init_ui(self) -> None:
         """Инициализация интерфейса."""
-        self.setStyleSheet(open("style.css").read())
+        self.setStyleSheet(open(self.configs_handler.path_to_styles).read())
         self.setWindowTitle("Registration")
         self.setFixedSize(500, 200)
         self.api_key = 0
@@ -80,6 +83,7 @@ class WindowToRegister(QDialog):
                 ]
                 
                 self.configs_handler.push_data(configs_to_add)
+                self.configs_handler.update()
 
                 message = QMessageBox.information(self, 'Успешно!', 'Регистрация прошла успешно, можете запускать!')
 
@@ -101,7 +105,7 @@ class WindowToAuth(QDialog):
         self.configs_handler = ConfigsHandler()
 
     def init_ui(self):
-        self.setStyleSheet(open("style.css").read())
+        self.setStyleSheet(open(self.configs_handler.path_to_styles).read())
         self.setWindowTitle("Log in")
         self.setFixedSize(400, 130)
         self.api_key = 0
@@ -147,7 +151,8 @@ class WindowToAuth(QDialog):
                 ['User_settings', 'video_num_from_channel', '5']
             ]
 
-            self.configs_handler.push_data(configs_to_add)            
+            self.configs_handler.push_data(configs_to_add) 
+            self.configs_handler.update()           
             message = QMessageBox.information(self, 'Успешно!', 'Вы успешно вошли в аккаунт!')
 
         else:
@@ -161,7 +166,7 @@ class WinSettings(QDialog):
         self.configs_handler = ConfigsHandler()
 
     def init_ui(self):
-        self.setStyleSheet(open("style.css").read())
+        self.setStyleSheet(open(self.configs_handler.path_to_styles).read())
         self.setWindowTitle("Settings")
         self.setFixedSize(400, 200)
         self.lbl_video_settings = QLabel(self)
@@ -206,6 +211,7 @@ class WinSettings(QDialog):
             ]
             
             self.configs_handler.push_data(configs_to_add)
+            self.configs_handler.update()
 
 
         else:
@@ -213,7 +219,7 @@ class WinSettings(QDialog):
             return False
 
         if login:
-            token = self.configs_handler.get_token()
+            token = self.configs_handler.token
 
             parametrs = {
                 'token': token
@@ -234,7 +240,7 @@ class WinSettings(QDialog):
         if api_key:
             
             #Если все работает, то продолжаем.
-            token = self.configs_handler.get_token()
+            token = self.configs_handler.token
 
             parametrs = {
                 'token': token
@@ -254,11 +260,11 @@ class WinAddChannel(QDialog):
     def __init__(self):
         super().__init__()
         self.init_ui()
-        self.config_handler = ConfigsHandler()
+        self.configs_handler = ConfigsHandler()
         
     def init_ui(self):
         """Инициализация окна."""
-        self.setStyleSheet(open("style.css").read())
+        self.setStyleSheet(open(self.configs_handler.path_to_styles).read())
         self.setWindowTitle("Add channel")
         self.setFixedSize(490, 160)
         self.prompt = QLabel(self)
@@ -276,7 +282,7 @@ class WinAddChannel(QDialog):
     def add_channel(self):
         """Добавления данных в таблицу."""
         channel_url = self.led_channel_url.text()
-        token = self.config_handler.get_token()
+        token = self.configs_handler.token
 
         parametrs = {
             'channel_url': channel_url,
@@ -306,7 +312,7 @@ class WinDelChannel(QDialog):
         self.configs_handler = ConfigsHandler()
 
     def init_ui(self):
-        self.setStyleSheet(open("style.css").read())
+        self.setStyleSheet(open(self.configs_handler.path_to_styles).read())
         self.setWindowTitle("Del channel")
         self.setFixedSize(490, 160)
         self.prompt = QLabel(self)
@@ -324,7 +330,7 @@ class WinDelChannel(QDialog):
     def del_channel(self):
         """Удаление канала, который лежит в self.led_channel_url."""
         channel_url = self.led_channel_url.text()
-        token = self.configs_handler.get_token()
+        token = self.configs_handler.token
 
         parametrs = {
             'channel_url': channel_url,
@@ -343,3 +349,118 @@ class WinDelChannel(QDialog):
 
         elif response_code == 405:
             message = QMessageBox.warning(self, 'Ошибка!', 'Канала нет в вашем списке!')
+
+class WinSearchVideo(QDialog):
+    """Класс виджета для поиска видео."""
+    
+    def __init__(self) -> None:
+        super().__init__()
+
+        self.buttons = {}
+
+        self.youtube_parser = YouTubeChannelsParser()
+        self.configs_handler = ConfigsHandler()
+
+        self.setStyleSheet(open(self.configs_handler.path_to_styles).read())
+        self.init_UI()
+        self.show()
+
+    def init_UI(self) -> None:
+        """Инициализация интерфейса окна."""
+        self.layout_global = QVBoxLayout()
+        self.layout_search = QHBoxLayout()
+
+        #Поле для ввода запроса поиска.
+        self.led_search = QLineEdit()
+        self.led_search.setPlaceholderText('Поиск')
+
+        self.layout_search.addWidget(self.led_search)
+
+        #Кнопка поиска введенного запроса.
+        self.btn_search = QPushButton('Поиск')
+        self.btn_search.clicked.connect(self._search)
+
+        self.layout_search.addWidget(self.btn_search)
+
+        self.layout_global.addLayout(self.layout_search)
+        self.layout_global.addStretch()
+        self.setLayout(self.layout_global)
+
+    def _search(self) -> list:
+        """Поиск видео по запросу."""
+        search_request = self.led_search.text()
+
+        video_info = self.youtube_parser.search(search_request)
+
+        self.youtube_parser.get_videos_prewiew(video_info)
+
+        self.layout_video = QHBoxLayout()
+
+        # Добавление превью видео.
+        self.pixmap_prewiew = QPixmap('temp/1.jpg')
+        self.lbl_prewiew = QLabel()
+        self.lbl_prewiew.setPixmap(self.pixmap_prewiew)
+        
+        self.layout_video.addWidget(self.lbl_prewiew)
+
+        self.layout_video_text_info = QVBoxLayout()
+
+        # Добавление названия видео.
+        video_title = video_info[0][2]
+        self.lbl_video_title = QLabel()
+        self.lbl_video_title.setText(video_title)
+        
+        self.layout_video_text_info.addWidget(self.lbl_video_title)
+
+        # Добавление названия канала.
+        channel_title = video_info[0][3]
+        self.lbl_channel_title = QLabel()
+        self.lbl_channel_title.setText(channel_title)
+
+        self.layout_video_text_info.addWidget(self.lbl_channel_title)
+
+        # Добавление даты загрузки.
+        publish_date = video_info[0][4]
+        publish_date = self._get_date_in_words(publish_date)
+        self.lbl_publish_date = QLabel()
+        self.lbl_publish_date.setText(publish_date)
+
+        self.layout_video_text_info.addWidget(self.lbl_publish_date)
+
+        #Добавление кнопки запуска видео.
+        run_button = QPushButton("Открыть видео")
+        run_button.clicked.connect(lambda checked, url=video_info[0][0]: self._open_video(url))
+        
+        self.layout_video_text_info.addWidget(run_button)
+
+        self.layout_video.addLayout(self.layout_video_text_info)
+        
+        self.layout_global.addLayout(self.layout_video)
+
+        self.update()
+    
+    def _open_video(self, url):
+        """Открытие видео по ссылке."""
+        video_url = YouTube(url).streams.get_by_itag(22).url
+        self.video_player = VideoPlayer(video_url)
+
+    def _get_date_in_words(self, date):
+        """Получение из такого 2021-08-27: такое 27 августа 2021 года."""
+        date = date.split('T')[0]
+        date = date.split('-')
+        digits_to_words = {
+            "01": "января",
+            "02": "февраля",
+            "03": "марта",
+            "04": "апреля",
+            "05": "мая",
+            "06": "июня",
+            "07": "июля",
+            "08": "августа",
+            "09": "сентября",
+            "10": "октября",
+            "11": "ноября",
+            "12": "декабря"
+        }
+        result = f"{date[2]} {digits_to_words[date[1]]} {date[0]} года"
+        return result
