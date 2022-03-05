@@ -125,3 +125,9 @@ dmypy.json
 .pyre/
 
 python/test.py
+temp
+config.ini
+icons.qrc
+good_tube_interface.ui
+python/client_files/interface.py
+опрос

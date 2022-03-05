@@ -1,92 +1,167 @@
-from functools import cached_property
 import sys
 import threading
 
 from pytube import YouTube
 
-from PyQt5.QtCore import pyqtSignal, QObject, QRect
-from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox, QPushButton, QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QGridLayout
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtCore import pyqtSignal, QObject, QPropertyAnimation, QEasingCurve, QSize, Qt
+from PyQt5.QtWidgets import QApplication, QMainWindow, QDialog, QMessageBox, QLabel, QPushButton, QHBoxLayout, QVBoxLayout, QFrame
+from PyQt5.QtGui import QIcon, QPixmap
 
-from youtube_parser import YouTubeChannelsParser
-from application_windows import WindowToRegister, WindowToAuth, WinAddChannel, WinDelChannel, WinSettings, WinSearchVideo
-from video_player import VideoPlayer
 from configs_handler import ConfigsHandler
-
-import faulthandler
-faulthandler.enable()
-
-
-class UrlProvider(QObject):
-    finished = pyqtSignal(str)
-    def find_url(self, url):
-        threading.Thread(target=self._find_url, args=(url,), daemon=True).start()
-    def find_url(self, url):
-        video_url = YouTube(url).streams.get_by_itag(85).url
-        self.finished.emit(video_url)
+from qt_designer_interfaces.main_window import Ui_MainWindow
+from qt_designer_interfaces.welcome_window import Ui_welcome_window
+from qt_designer_interfaces.logon import Ui_form_logon
+from qt_designer_interfaces.login import Ui_form_login
+from client import RequestsHandler
+from youtube_parser import YouTubParser
+from video_player import VideoPlayer
 
 
-class GoodYoutubeGUI(QDialog):
-    def __init__(self):
-        super().__init__()
+class AppLogic():
+    """
+    Логика приложения: открытие окон вначале, 
+    закрытие одного окна и открытие другого.
+    """
+
+    def __init__(self) -> None:
         self.configs_handler = ConfigsHandler()
+        self.request_handler = RequestsHandler()
 
-        self.setStyleSheet(open(self.configs_handler.path_to_styles).read())
-        self.setWindowTitle("Good Youtube")
+        self.response_bad_messages = { # Коды ошибок возвращаемого json с API.
+            401: "Неправильный токен. Перезайдите в аккаунт!",
+            402: "Неправильный ключ API",
+            403: "Логин уже занят",
+            404: "Канал уже существует в вашем списке",
+            405: "Канал не существует в вашем списке",
+            406: "Аккаунт не существует",
+            407: "Неправильная ссылка на канал",
+            408: "Короткий логин",
+            409: "Короткйи пароль"
+        }
+
+        #Открытие окна.
+        win_num = self._define_window() 
+        self._open_first_window(win_num)
+
+    def _define_window(self) -> int:
+        """
+        Выбор окна при запуска по наличию токена от аккаунта.
+        Функия возвращает 1 -> открытие окна главного контента,
+        функция возвращает 2 -> открытие окна выбора входа или регистрации. 
+        """
+
+        token = self.configs_handler.token
+
+        return 1 if token else 2
+
+    def _open_first_window(self, win_num: int) -> None:
+        """Открытие окна по номеру."""    
+        if win_num == 1:
+            self._open_main_window()
+
+        elif win_num == 2:
+            self._open_welcome_window()
+    
+    def _open_main_window(self) -> None:
+        """Открытие главного окна."""
+        user_api_key = self._get_user_api_key()
+        self.youtube_parser = YouTubParser(user_api_key) # Инициализация класса парсера YouTube.
+
+        self.ui_main_window = Ui_MainWindow()
+        self.main_window = QMainWindow()
+        self.ui_main_window.setupUi(self.main_window)
+
+        # self.ui_main_window.btn_search.clicked.connect(sel) TODO: search function
+        self.ui_main_window.btn_menu.clicked.connect(self._slide_menu)
+        self.ui_main_window.btn_update_settings.clicked.connect(self._update_settings)
+        self.ui_main_window.btn_add_channel.clicked.connect(self._add_channel)
+        self.ui_main_window.btn_del_channel.clicked.connect(self._del_channel)
+
+        self._generate_videos()
         
-        self.buttons = []
-        youtube_parser = YouTubeChannelsParser()
-        self.video_links_and_info = youtube_parser.parse()
-        youtube_parser.get_videos_prewiew(self.video_links_and_info)
+        self.main_window.show()
 
-        self.setFixedHeight(len(self.video_links_and_info) * (180 + 20))
-        # self.url_provider.finished.connect(self.handle_url_finished)
-        self.generate_content()
+    def _generate_videos(self) -> None:
+        """
+        Генерирование видео с выбранных каналов пользователя.
+        """
 
-    # @cached_property
-    # def url_provider(self):
-        # return UrlProvider()
+        # Инициализация данных о видео.
+        video_links_and_info = self._get_video_links_and_info() 
+        self.youtube_parser.get_videos_preview(video_links_and_info)
 
-    def generate_buttons_info(self):
-        buttons_info = {}
-        for link in self.video_links_and_info:
-            button = QPushButton("Открыть видео", self)
-            button.setFixedSize(150, 30)
-            buttons_info[button] = link
+        video_column_num = 0
+        video_row_num = 0
 
-        return buttons_info
+        for video_link_and_info in video_links_and_info:
+            
+            video_layout = QHBoxLayout() # Макет блока видео. Слева распологается превью видео, справа информация о видео.
 
-    def generate_content(self):
-        pos_y = 0 #Порядковый номер каждого блока видео.
-        for button, link in self.generate_buttons_info().items():
-            #Создание пиксмапа превью.
-            path_to_prewiew = f"temp/{pos_y + 1}.jpg"
-            pixmap_img = QPixmap(path_to_prewiew)
-            lbl = QLabel(self)
-            lbl.setPixmap(pixmap_img)
-            lbl.move(0, 200 * pos_y)
-            lbl = QLabel(self)
-            lbl.setText(link[2])
-            lbl.move(320, 200 * pos_y)
-            lbl = QLabel(self)
-            lbl.setText(link[3])
-            lbl.move(320, 20 + 200 * pos_y)
-            lbl = QLabel(self)
-            lbl.setText(self.get_date_in_words(link[4]))
-            lbl.move(320, 40 + 200 * pos_y)
-            button.clicked.connect(lambda checked, link=link[0]: self.handle_url_finished(link))
-            button.move(320, 60 + pos_y * 200)
-            pos_y += 1
+            video_link, video_id, video_title, channel_title, publish_time = video_link_and_info
 
-    def open_video(self, url):
-        self.url_provider.find_url(url)
+            # Создание превью видео и добавление в макет.
+            path_to_video_preview = f"temp/{video_id}.jpg"
+            pxm_prewiew = QPixmap(path_to_video_preview)
+            lbl_video_preview = QLabel()
+            lbl_video_preview.setMinimumSize(320, 180)
+            lbl_video_preview.setPixmap(pxm_prewiew)
 
-    def handle_url_finished(self, url):
-        video_url = YouTube(url).streams.get_by_itag(22).url
-        self.video_player = VideoPlayer(video_url)
+            video_layout.addWidget(lbl_video_preview)
 
-    def get_date_in_words(self, date):
-        """Получение из такого 2021-08-27 такое 27 августа 2021 года."""
+            video_text_info_layout = QVBoxLayout()
+
+            # Обрезание названия видео, если оно больше 85 символов и добавление троеточия в конце.
+            video_title = video_title[:82] + '...' if len(video_title) > 85 else video_title
+
+            lbl_video_title = QLabel()
+            lbl_video_title.setWordWrap(True)
+            lbl_video_title.setText(video_title)
+            lbl_video_title.setMaximumWidth(200)
+
+            video_text_info_layout.addWidget(lbl_video_title)
+
+            lbl_channel_title = QLabel()
+            lbl_channel_title.setWordWrap(True)
+            lbl_channel_title.setText(channel_title)
+            lbl_channel_title.setMaximumWidth(200)
+        
+            video_text_info_layout.addWidget(lbl_channel_title)
+
+            normal_date = self._get_normal_date(publish_time)
+            lbl_published_date = QLabel()
+            lbl_published_date.setWordWrap(True)
+            lbl_published_date.setText(normal_date)
+            lbl_published_date.setMaximumWidth(200)
+
+            video_text_info_layout.addWidget(lbl_published_date)
+
+            btn_open_video = QPushButton("Открыть видео")
+            btn_open_video.clicked.connect(self._open_video)
+
+            video_text_info_layout.addWidget(btn_open_video)
+
+            video_layout.addLayout(video_text_info_layout)
+
+            self._add_video_layout(video_layout, video_row_num, video_column_num)
+            
+            video_column_num += 1 # Увеличивание столбца видео после каждого добавления.
+            video_row_num += video_column_num // 3 # Увеличивание номера ряда, если номер столбца достиг 3, т.к. в одном ряду 3 элемента
+            video_column_num %= 3 # Если номер столбца был равен 3, то он обновляется обратно в 0
+            
+    def _add_video_layout(self, video_layout: QHBoxLayout, row_num: int, column_num: int) -> None:
+            """
+            Добавление макета с видео на главное окно.
+            """
+            self.frame = QFrame(self.ui_main_window.scrollAreaWidgetContents)
+            self.frame.setMaximumSize(QSize(520, 200))
+            self.frame.setMinimumSize(QSize(520, 200))
+            self.frame.setLayout(video_layout)
+            self.frame.setContentsMargins(0, 0, 0, 0)
+
+            self.ui_main_window.gridLayout_2.addWidget(self.frame, row_num, column_num, 1, 1)
+
+    def _get_normal_date(self, date):
+        """Получение из такого 2021-08-27 в такое 27 августа 2021 года."""
         date = date.split('T')[0]
         date = date.split('-')
         digits_to_words = {
@@ -106,151 +181,211 @@ class GoodYoutubeGUI(QDialog):
         result = f"{date[2]} {digits_to_words[date[1]]} {date[0]} года"
         return result
 
+    def _get_video_links_and_info(self) -> list:
+        """Получение списка каналов пользователя"""
+        user_channels_url = self._get_user_channels_url()
+        video_links_and_info = self.youtube_parser.parse(user_channels_url)
 
-class MainMenu(QWidget):
-    """Меню в котором кнопка для того, чтобы поставить ключ и запуска основного окна."""
-    def __init__(self):
-        super().__init__()
+        return video_links_and_info
 
-        self.config_handler = ConfigsHandler()
+    def _get_user_channels_url(self) -> list:
+        token = self.configs_handler.token
+        
+        response = self.request_handler.get_user_channels_url(token) # Запрос на API на получение списка каналов пользователя.
+        response_code = response['response']
 
-        self.init_ui()
+        if response_code == 200:
+            user_channels_url = response['channels_list']           
 
-    def init_ui(self):
-        self.setFixedSize(600, 600)
-        print(self.config_handler.path_to_styles)
-        self.setStyleSheet(open(self.config_handler.path_to_styles).read())
-        #Кнопка регистрации.
-        self.btn_register = QPushButton("Регистрация", self)
-        self.btn_register.setFixedSize(150, 30)
-        # self.btn_register.setStyleSheet("background: ")
-        self.btn_register.clicked.connect(self.open_registration_win)
-        self.btn_register.move(449, 1)
-        #Кнопка входа.
-        self.btn_autorize = QPushButton("Войти", self)
-        self.btn_autorize.setFixedSize(150, 30)
-        self.btn_autorize.clicked.connect(self.open_auth_win)
-        self.btn_autorize.move(294, 1)
-        #Кнопка запуска.
-        self.btn_run = QPushButton("Запустить", self)
-        self.btn_run.setFixedSize(150, 50)
-        # self.btn_run.setStyleSheet("border-radius: 3px; background: orange; color: white;")
-        self.btn_run.clicked.connect(self.open_main_content)
-        self.btn_run.move(225, 250)
-        #Кнопка настроек.
-        self.btn_settings = QPushButton("Настройки", self)
-        self.btn_settings.setFixedSize(150, 50)
-        # self.btn_settings.setStyleSheet("border-radius: 3px; background: orange; color: white;")
-        self.btn_settings.clicked.connect(self.open_settings_win)
-        self.btn_settings.move(225, 305)
-        #Кнопка добавления канала.
-        self.btn_add_channel = QPushButton("Добавить канал", self)
-        self.btn_add_channel.setFixedSize(150, 50)
-        # self.btn_add_channel.setStyleSheet("border-radius: 3px; background: orange; color: white;")
-        self.btn_add_channel.clicked.connect(self.open_channel_adding_win)
-        self.btn_add_channel.move(225, 360)
-        #Кнопка удаления канала.
-        self.btn_del_channel = QPushButton("Удалить канал", self)
-        self.btn_del_channel.setFixedSize(150, 50)
-        # self.btn_del_channel.setStyleSheet("border-radius: 3px; background: orange; color: white;")
-        self.btn_del_channel.clicked.connect(self.open_channel_deleting_win)
-        self.btn_del_channel.move(225, 415)
-        #Кнопка открытия окна поиска.
-        self.btn_search_video = QPushButton("Поиск видео", self)
-        self.btn_search_video.setFixedSize(150, 50)
-        self.btn_search_video.clicked.connect(self.open_search_win)
-        self.btn_search_video.move(225, 470)
+        else:
+            user_channels_url = []
 
+        return user_channels_url 
 
-    def open_registration_win(self):
-        """Открытия окна для регистрации."""
-        self.win = WindowToRegister()
+    def _get_user_api_key(self) -> str:
+        """Получение ключа YouTube API пользователя."""
+        token = self.configs_handler.token
 
-    def open_auth_win(self):
-        """Открытие окна для входа."""
-        self.win = WindowToAuth()
+        response = self.request_handler.get_user_api_key(token) # Запрос на API на получение ключа YouTube API пользователя.
+        response_code = response['response']
+
+        if response_code == 200:
+            user_api_key = response['api_key']
+
+        else:
+            user_api_key = ""
+        
+        return user_api_key
     
-    def open_main_content(self):
-        """Получение ключа и инициализация контента"""
-        token = self.config_handler._get_token()
+    def _open_video(self, video_page_url: str) -> None:
+        """Открытие видео по ссылке."""
+        video_url = YouTube("https://www.youtube.com/watch?v=3QwpRXR-IUc").streams.get_by_itag(85).url
+        VideoPlayer(video_url)
 
-        if token:
-            self.destroy()
-            self.win_goodtube = ScrollWidget()
-            self.win_goodtube.show()
+    def _slide_menu(self) -> None:
+        """Выдвижени или закрытие меню в зависимости от его прошлого состояния."""
+        width = self.ui_main_window.frame_left_menu_container.width()
 
-        else:
-            message = QMessageBox.warning(self, 'Ошибки!', 'Войдите в аккаунт!')
+        if width == 0: # Увеличение меню, если он закрыт.
+            new_width = 260
+            self.ui_main_window.btn_menu.setIcon(QIcon('icons/стрелка влево.png'))
 
-    def open_settings_win(self):
-        """Открытие окна с настройками."""
-        token = self.config_handler._get_token()
+        else: # Уменьшение меню, если он открыт.
+            new_width = 0
+            self.ui_main_window.btn_menu.setIcon(QIcon('icons/меню.png'))
 
-        if token:
-            self.win = WinSettings()
+        # Анимация закрытия или открытия.
+        self.animation = QPropertyAnimation(self.ui_main_window.frame_left_menu_container, b'maximumWidth')
+        self.animation.setDuration(250)
+        self.animation.setStartValue(width)
+        self.animation.setEndValue(new_width)
+        self.animation.setEasingCurve(QEasingCurve.InOutQuart)
+        self.animation.start()
 
-        else:
-            message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
+    def _update_settings(self) -> None:
+        """Обновление настроек пользователя."""
+        login = self.ui_main_window.led_login.text()
+        api_key = self.ui_main_window.led_api_key.text()
+        token = self.configs_handler.token
 
-    def open_channel_adding_win(self):
-        """Добавление в таблицу со столбцами каналов новый канал."""
-        token = self.config_handler._get_token()
+        response = self.request_handler.update_settings(login, api_key, token)
+        response_code = response['response']
 
-        if token:
-            self.win = WinAddChannel()
-
-        else:
-            message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
-    
-    def open_channel_deleting_win(self):
-        """Окно для удаления из таблицы со столбцами каналов введенный канал."""
-        token = self.config_handler._get_token()
-
-        if token:
-            self.win = WinDelChannel()
-
-        else:
-            message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
-
-    def open_search_win(self):
-        """Окно с информацией о найденном видео."""
-        token = self.config_handler._get_token()
-
-        if token:
-            self.win = WinSearchVideo()
+        if response_code == 200:
+            QMessageBox.information(self.ui_main_window.frame_main_content, 'Успешно!', 'Настройки обновлены!')
         
         else:
-            message = QMessageBox.warning(self, 'Войдите в аккаунт!', 'Войдите в аккаунт!')
+            QMessageBox.warning(self.ui_main_window.frame_main_content, 'Ошибка!', self.response_bad_messages[response_code])
 
-class ScrollWidget(QWidget):      
-    def __init__(self, parent=None):
-        super(ScrollWidget, self).__init__(parent)
-        self.configs_handler = ConfigsHandler()
-        self.initUi()
+    def _add_channel(self) -> None:
+        """Добавление канала в список каналов."""
+        channel_url = self.ui_main_window.led_add_channel.text()
+        token = self.configs_handler.token        
 
-    def initUi(self):
-        self.setStyleSheet(open(self.configs_handler.path_to_styles).read())
-        self.layoutV = QVBoxLayout(self)
+        response = self.request_handler.add_channel(channel_url, token)
+        response_code = response['response']
 
-        self.area = QScrollArea(self)
-        self.area.setWidgetResizable(True)
-        self.scrollAreaWidgetContents = QWidget()
-        self.scrollAreaWidgetContents.setGeometry(QRect(0, 0, 200, 100))
+        if response_code == 200:
+            QMessageBox(self.ui_main_window.frame_main_content, 'Успешно!', 'Канал добавлен!')
 
-        self.layoutH = QHBoxLayout(self.scrollAreaWidgetContents)
-        self.gridLayout = QGridLayout()
-        self.layoutH.addLayout(self.gridLayout)
+        else:
+            QMessageBox(self.ui_main_window.frame_main_content, 'Ошибка!', self.response_bad_messages[response_code])
 
-        self.area.setWidget(self.scrollAreaWidgetContents)
-        self.layoutV.addWidget(self.area)
+    def _del_channel(self) -> None:
+        """Удаление канала со списка каналов."""
+        channel_url = self.ui_main_window.led_del_channel.text()
+        token = self.configs_handler.token
 
-        self.widget = GoodYoutubeGUI()
-        self.gridLayout.addWidget(self.widget)
-        window_height = len(self.widget.video_links_and_info) * 320
-        self.setGeometry(700, 200, 1000, window_height)        
+        response = self.request_handler.del_channel(channel_url, token)
+        response_code = response['response']
+
+        if response_code == 200:
+            QMessageBox(self.ui_main_window.frame_main_content, 'Успешно!', 'Канал удален!')
+
+        else:
+            QMessageBox(self.ui_main_window.frame_main_content, 'Ошибка!', self.response_bad_messages[response_code])
+
+    def _open_welcome_window(self) -> None:
+        """Открытие приветственного окна."""
+        self.ui_welcome_window = Ui_welcome_window()
+        self.welcome_window = QDialog()
+        self.ui_welcome_window.setupUi(self.welcome_window)
+        
+        self.ui_welcome_window.btn_login.clicked.connect(self._open_login_window)
+        self.ui_welcome_window.btn_logon.clicked.connect(self._open_logon_window)
+
+        self.welcome_window.show()
+
+    def _open_logon_window(self) -> None:
+        """Открытие окна для регистрации."""
+        self.ui_logon_window = Ui_form_logon()
+        self.logon_window = QDialog()
+        self.ui_logon_window.setupUi(self.logon_window)
+
+        self.ui_logon_window.btn_logon.clicked.connect(self._logon)
+
+        self.logon_window.show()
+    
+    def _logon(self) -> None:
+        """Обработка регистрации."""
+        login = self.ui_logon_window.led_login.text()
+        password = self.ui_logon_window.led_password.text()
+        api_key = self.ui_logon_window.led_api_key.text()
+        
+        response = self.request_handler.logon(login, password, api_key)
+        response_code = response['response']
+
+        if response_code == 200:
+            token = response['token']
+
+            configs_to_add = [
+                ['User_info', 'token', token],
+                ['User_settings', 'video_num_from_channel', '5'],
+                ['User_settings', 'path_to_styles', 'styles/style.css']
+            ]
+            
+            self.configs_handler.push_data(configs_to_add)
+            self.configs_handler.update()
+
+            QMessageBox.information(self.login_window, 'Успешно!', 'Вы успешно зарегистрировались!')
+
+            self._switch_to_main_window()
+
+        else:
+            QMessageBox.warning(self.logon_window, 'Ошибка!', self.response_bad_messages[response_code])
+
+    def _open_login_window(self) -> None:
+        """Открытие окна для входа."""
+        self.ui_login_window = Ui_form_login()
+        self.login_window = QDialog()
+        self.ui_login_window.setupUi(self.login_window)
+        
+        self.ui_login_window.btn_login.clicked.connect(self._login)
+        
+        self.login_window.show()
+    
+    def _login(self) -> None:
+        """Обработка входа."""
+        login = self.ui_login_window.led_login.text()
+        password = self.ui_login_window.led_password.text()
+
+        response = self.request_handler.login(login, password)
+        response_code = response['response']
+
+        if response_code == 200:
+            token = response['token']
+
+            configs_to_add = [
+                ['User_info', 'token', token],
+                ['User_settings', 'video_num_from_channel', '5'],
+                ['User_settings', 'path_to_styles', 'styles/style.css']
+            ]
+
+            self.configs_handler.push_data(configs_to_add) 
+            self.configs_handler.update()           
+            
+            QMessageBox.information(self.login_window, 'Успешно!', 'Вы успешно вошли в аккаунт!')
+
+            self._switch_to_main_window()
+
+        else:
+            QMessageBox.warning(self.login_window, 'Ошибка!', self.response_bad_messages[response_code])
+
+    def _switch_to_main_window(self) -> None:
+        """Закрытие всех окон и открытие главного окна."""
+        app.closeAllWindows()
+        self._open_main_window()
+    
+    def _switch_to_welcome_window(self) -> None:
+        """
+        Закрытие всех окон и переход на приветственное окно
+        выбор входа или регистрации.
+        """
+        app.closeAllWindows()
+        self._open_welcome_window()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MainMenu()
-    window.show()
+    app_logic = AppLogic()
     sys.exit(app.exec())

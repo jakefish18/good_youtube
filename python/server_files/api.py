@@ -17,7 +17,7 @@ def get_channel_list_by_id():
 
     if check_is_token:
         user_id = tokens_handler.get_user_id(token)
-        channels_list = channels_handler.get_channel_list(user_id)
+        channels_list = channels_handler.get_channels_list(user_id)
 
         response = {
             'response': 200,
@@ -63,38 +63,63 @@ def post_insert_new_user():
     login = str(request.args.get('login'))
     password = str(request.args.get('password'))
     api_key = str(request.args.get('api_key'))
+    
+    if len(login) < 4:
+
+        response = {
+            'response': 408
+        }
+
+        response = json.dumps(response)
+        return response
+
+    if len(password) < 8:
+
+        response = {
+            'response': 409
+        }
+
+        response = json.dumps(response)
+        return response
 
     is_api_key_correct = check_api_key(api_key)
-
     if not is_api_key_correct:
+
         response = {
             'response': 402 
         }
 
+        response = json.dumps(response)
+        return response
+
+    is_login_in_database = users_handler.is_login(login)
+    if is_login_in_database:
+
+        response = {
+            'response': 403
+        }
+
+        response = json.dumps(response)
+        return response
+
+    result = users_handler.insert_new_user(login, password, api_key)
+    if result:
+
+        response = {
+            'response': 200
+        }      
+
+        response = json.dumps(response)
+        return response          
+    
     else:
-        is_login_in_database = users_handler.is_login(login)
 
-        if is_login_in_database:
-            response = {
-                'response': 403
-            }
-        
-        else:
-            result = users_handler.insert_new_user(login, password, api_key)
+        response = {
+            'response': 404
+        }
 
-            if result:
-                response = {
-                    'response': 200
-                }                
-            
-            else:
-                response = {
-                    'response': 404
-                }
-
-    response = json.dumps(response)
-
-    return response
+        response = json.dumps(response)
+        return response
 
 @app.route('/add_channel/', methods=['GET'])
 def post_add_channel():
@@ -195,14 +220,23 @@ def get_generated_token():
 
     return response
 
-@app.route('/update_login/', methods=['GET'])
+@app.route('/update_user_login/', methods=['GET'])
 def update_login():
     login = str(request.args.get('login'))
     token = str(request.args.get('token'))
 
+    if len(login) < 4:
+
+        response = {
+            'response': 408
+        }
+
+        response = json.dumps(response)
+        return response    
+
     check_is_login = users_handler.is_login(login)
 
-    if check_is_login:
+    if not check_is_login:
         check_is_token = tokens_handler.is_token(token)
 
         if check_is_token:
@@ -210,14 +244,12 @@ def update_login():
             users_handler.update_user_login(user_id, login)
 
             response = {
-                'response': 200,
-                'updated': True
+                'response': 200
             }
 
         else:
             response = {
-                'response': 401,
-                'updated': False
+                'response': 401
             }
 
     else:

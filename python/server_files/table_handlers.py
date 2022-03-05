@@ -112,7 +112,7 @@ class ChannelsHandler(TableHandler):
         else:
             return False
 
-    def get_channel_list(self, id):
+    def get_channels_list(self, id):
         """Получение списка каналов y id."""
         channel_list = self.select_execute(f"select channel_url from channels where id='{id}'")
         channel_list = [url[0] for url in channel_list] # Преобразование из [(url), (url), (url)] в [url, url, url].
