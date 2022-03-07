@@ -65,6 +65,7 @@ class AppLogic():
     def _open_main_window(self) -> None:
         """Открытие главного окна."""
         user_api_key = self._get_user_api_key()
+        print(user_api_key)
         self.youtube_parser = YouTubParser(user_api_key) # Инициализация класса парсера YouTube.
 
         self.ui_main_window = Ui_MainWindow()
@@ -136,7 +137,8 @@ class AppLogic():
             video_text_info_layout.addWidget(lbl_published_date)
 
             btn_open_video = QPushButton("Открыть видео")
-            btn_open_video.clicked.connect(self._open_video)
+            print(video_link)
+            btn_open_video.clicked.connect(lambda video_link=video_link: self._open_video(video_link))
 
             video_text_info_layout.addWidget(btn_open_video)
 
@@ -219,8 +221,10 @@ class AppLogic():
     
     def _open_video(self, video_page_url: str) -> None:
         """Открытие видео по ссылке."""
-        video_url = YouTube("https://www.youtube.com/watch?v=3QwpRXR-IUc").streams.get_by_itag(85).url
-        VideoPlayer(video_url)
+        video_page_url = "https://www.youtube.com/watch?v=TX81PMeAwwU"
+        video_url = YouTube(video_page_url).streams.get_by_itag(136).url
+        print(video_url)
+        player = VideoPlayer(video_url)
 
     def _slide_menu(self) -> None:
         """Выдвижени или закрытие меню в зависимости от его прошлого состояния."""
@@ -362,7 +366,7 @@ class AppLogic():
             ]
 
             self.configs_handler.push_data(configs_to_add) 
-            self.configs_handler.update()           
+            self.configs_handler.update_variables()           
             
             QMessageBox.information(self.login_window, 'Успешно!', 'Вы успешно вошли в аккаунт!')
 
