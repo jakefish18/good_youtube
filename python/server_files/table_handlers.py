@@ -93,7 +93,12 @@ class UsersHandler(TableHandler):
 
         return result[0]
     
-    
+    def get_user_login_by_id(self, id: str) -> str:
+        """Получение логина пользователя по его id."""
+        result = self.select_execute(f"select * from users where id='{id}'")[0]
+
+        return result[1]
+
     def get_user_api_key(self, user_id: str) -> str:
         """Получение ключа апи пользователя по его id."""
         result = self.select_execute(f"select * from users where id='{user_id}'")[0]

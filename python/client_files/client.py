@@ -161,6 +161,22 @@ class RequestsHandler():
 
         return response
 
+    def get_user_login(self, token: str) -> str:
+        """
+        Получение логина пользователя
+        Коды возвращаемого словаря:
+        200 -> OK
+        401 -> клиент не авторизован
+        """
+
+        request_parametrs = {
+            'token': token
+        }
+        
+        response = self._get_good_tube_api_response('get_user_login', request_parametrs)
+    
+        return response
+
     def _get_good_tube_api_response(self, task: str, parameters: dict) -> dict:    
         """Отправка запроса на API и возвращение результата."""
         base_url = "http://92.255.108.65:12345"

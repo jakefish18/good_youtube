@@ -1,3 +1,4 @@
+from crypt import methods
 import json
 import requests as global_requests
 
@@ -46,6 +47,31 @@ def get_user_api_key():
         response = {
             'response': 200,
             'api_key': api_key 
+        }
+
+    else:
+        response = {
+            'response': 401
+
+        }
+    
+    response = json.dumps(response)
+
+    return response
+
+@app.route('/get_user_login', methods=['GET'])
+def get_user_login():
+    token = str(request.args.get('login'))
+
+    check_is_token  = tokens_handler.is_token(token)
+
+    if check_is_token:
+        user_id = tokens_handler.get_user_id(token)
+        login = users_handler.get_user_login_by_id(user_id)
+        
+        resoponse = {
+            'response': 200,
+            'login': login 
         }
 
     else:

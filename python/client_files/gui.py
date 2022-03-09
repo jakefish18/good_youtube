@@ -71,6 +71,7 @@ class AppLogic():
         self.ui_main_window = Ui_MainWindow()
         self.main_window = QMainWindow()
         self.ui_main_window.setupUi(self.main_window)
+        self._show_login_to_user()
 
         # self.ui_main_window.btn_search.clicked.connect(sel) TODO: search function
         self.ui_main_window.btn_menu.clicked.connect(self._slide_menu)
@@ -81,6 +82,19 @@ class AppLogic():
         self._generate_videos()
         
         self.main_window.show()
+
+    def _show_login_to_user(self) -> None:
+        """Вставка логина пользователя в правый верхний угол окна."""
+        token = self.configs_handler.token
+        response = self.request_handler.get_user_login(token)
+        response_code = response['response']
+
+        if response_code == 200:
+            login = response['login']
+            self.ui_main_window.lbl_account_info.setText(login)
+
+        else:
+            QMessageBox.warning(self.main_window, 'Ошибка!', self.response_bad_messages[response_code])
 
     def _generate_videos(self) -> None:
         """
@@ -124,7 +138,7 @@ class AppLogic():
             lbl_channel_title = QLabel()
             lbl_channel_title.setWordWrap(True)
             lbl_channel_title.setText(channel_title)
-            lbl_channel_title.setMaximumWidth(200)
+            lbl_channel_title.setMaximumWidth(200)                          
         
             video_text_info_layout.addWidget(lbl_channel_title)
 
@@ -161,6 +175,7 @@ class AppLogic():
             self.frame.setContentsMargins(0, 0, 0, 0)
 
             self.ui_main_window.gridLayout_2.addWidget(self.frame, row_num, column_num, 1, 1)
+            
 
     def _get_normal_date(self, date):
         """Получение из такого 2021-08-27 в такое 27 августа 2021 года."""
@@ -222,18 +237,16 @@ class AppLogic():
     def _open_video(self, video_page_url: str) -> None:
         """Открытие видео по ссылке."""
         video_page_url = "https://www.youtube.com/watch?v=TX81PMeAwwU"
-        video_url = YouTube(video_page_url).streams.get_by_itag(136).url
-        print(video_url)
-        player = VideoPlayer(video_url)
+        video_url = YouTube(video_page_url).streams.get_by_itag(85).url
+        self.player = VideoPlayer(video_url)
 
     def _slide_menu(self) -> None:
         """Выдвижени или закрытие меню в зависимости от его прошлого состояния."""
         width = self.ui_main_window.frame_left_menu_container.width()
-
         if width == 0: # Увеличение меню, если он закрыт.
             new_width = 260
             self.ui_main_window.btn_menu.setIcon(QIcon('icons/стрелка влево.png'))
-
+            print(new_width)
         else: # Уменьшение меню, если он открыт.
             new_width = 0
             self.ui_main_window.btn_menu.setIcon(QIcon('icons/меню.png'))
