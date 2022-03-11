@@ -12,6 +12,7 @@ from qt_designer_interfaces.main_window import Ui_MainWindow
 from qt_designer_interfaces.welcome_window import Ui_welcome_window
 from qt_designer_interfaces.logon import Ui_form_logon
 from qt_designer_interfaces.login import Ui_form_login
+from qt_designer_interfaces.message_window import Ui_Message
 from client import RequestsHandler
 from youtube_parser import YouTubParser
 from video_player import VideoPlayer
@@ -27,7 +28,8 @@ class AppLogic():
         self.configs_handler = ConfigsHandler()
         self.request_handler = RequestsHandler()
 
-        self.response_bad_messages = { # Коды ошибок возвращаемого json с API.
+        self.response_messages = { # Коды возвращаемого json с API.
+            200: "Успешно!",
             401: "Неправильный токен. Перезайдите в аккаунт!",
             402: "Неправильный ключ API",
             403: "Логин уже занят",
@@ -94,7 +96,7 @@ class AppLogic():
             self.ui_main_window.lbl_account_info.setText(login)
 
         else:
-            QMessageBox.warning(self.main_window, 'Ошибка!', self.response_bad_messages[response_code])
+            self._show_message(self.response_messages[response_code])
 
     def _generate_videos(self) -> None:
         """
@@ -268,11 +270,7 @@ class AppLogic():
         response = self.request_handler.update_settings(login, api_key, token)
         response_code = response['response']
 
-        if response_code == 200:
-            QMessageBox.information(self.ui_main_window.frame_main_content, 'Успешно!', 'Настройки обновлены!')
-        
-        else:
-            QMessageBox.warning(self.ui_main_window.frame_main_content, 'Ошибка!', self.response_bad_messages[response_code])
+        self._show_message(self.response_messages[response_code])
 
     def _add_channel(self) -> None:
         """Добавление канала в список каналов."""
@@ -282,11 +280,7 @@ class AppLogic():
         response = self.request_handler.add_channel(channel_url, token)
         response_code = response['response']
 
-        if response_code == 200:
-            QMessageBox(self.ui_main_window.frame_main_content, 'Успешно!', 'Канал добавлен!')
-
-        else:
-            QMessageBox(self.ui_main_window.frame_main_content, 'Ошибка!', self.response_bad_messages[response_code])
+        self._show_message(self.response_messages[response_code])
 
     def _del_channel(self) -> None:
         """Удаление канала со списка каналов."""
@@ -296,11 +290,7 @@ class AppLogic():
         response = self.request_handler.del_channel(channel_url, token)
         response_code = response['response']
 
-        if response_code == 200:
-            QMessageBox(self.ui_main_window.frame_main_content, 'Успешно!', 'Канал удален!')
-
-        else:
-            QMessageBox(self.ui_main_window.frame_main_content, 'Ошибка!', self.response_bad_messages[response_code])
+        self._show_message(self.response_messages[response_code])
 
     def _open_welcome_window(self) -> None:
         """Открытие приветственного окна."""
@@ -344,12 +334,12 @@ class AppLogic():
             self.configs_handler.push_data(configs_to_add)
             self.configs_handler.update()
 
-            QMessageBox.information(self.login_window, 'Успешно!', 'Вы успешно зарегистрировались!')
-
             self._switch_to_main_window()
-
+        
         else:
-            QMessageBox.warning(self.logon_window, 'Ошибка!', self.response_bad_messages[response_code])
+            self._show_message(self.response_messages[response_code])
+
+        
 
     def _open_login_window(self) -> None:
         """Открытие окна для входа."""
@@ -380,13 +370,20 @@ class AppLogic():
 
             self.configs_handler.push_data(configs_to_add) 
             self.configs_handler.update_variables()           
-            
-            QMessageBox.information(self.login_window, 'Успешно!', 'Вы успешно вошли в аккаунт!')
 
             self._switch_to_main_window()
 
         else:
-            QMessageBox.warning(self.login_window, 'Ошибка!', self.response_bad_messages[response_code])
+            self._show_message(self.response_messages[response_code])
+
+    def _show_message(self, message: str) -> None:
+        """Открытие окна с введенным сообщением."""
+        self.ui_message_window = Ui_Message()
+        self.message_window = QDialog()
+        self.ui_message_window.setupUi(self.message_window)
+        self.ui_message_window.lbl_message_text.setText(message)
+        self.ui_message_window.btn_exit.clicked.connect(self.message_window.close)
+        self.message_window.show()
 
     def _switch_to_main_window(self) -> None:
         """Закрытие всех окон и открытие главного окна."""
