@@ -422,6 +422,14 @@ class Ui_MainWindow(object):
         self.frame_main_content.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frame_main_content.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frame_main_content.setObjectName("frame_main_content")
+        self.frame_main_content.setStyleSheet("""QPushButton:hover {
+    border-radius: 6px;
+    background-color: #fc8383;
+}
+QPushButton:pressed {
+    border-radius: 6px;
+    background-color: #ff4545;
+}""")
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.frame_main_content)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
         self.scrollArea = QtWidgets.QScrollArea(self.frame_main_content)
